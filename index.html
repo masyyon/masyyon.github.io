@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チェックシート</title>
+    <link rel="stylesheet" href="css/base.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>チェックシート</h1>
+            <div class="button-group">
+                <button class="btn" onclick="saveToJSON()">JSON保存</button>
+                <button class="btn" onclick="document.getElementById('loadFile').click()">JSON読み込み</button>
+                <input type="file" id="loadFile" accept=".json" style="display: none;" onchange="loadFromJSON(event)">
+                <button class="btn" id="editButton" onclick="enableEditMode()">編集</button>
+            </div>
+        </div>
+
+        <!-- 基本情報セクション -->
+        <div class="section">
+            <div class="section-header">基本情報</div>
+            <div class="section-content basic-info">
+                <div class="question-row">
+                    <div class="question-title">1. 受付番号</div>
+                    <div class="question-input">
+                        <input type="number" class="form-control" data-field="receptionNumber" placeholder="受付番号">
+                    </div>
+                </div>
+                
+                <div class="question-row">
+                    <div class="question-title">2. 顧客番号</div>
+                    <div class="question-input">
+                        <input type="number" class="form-control" data-field="customerNumber" placeholder="顧客番号">
+                    </div>
+                </div>
+                
+                <div class="question-row">
+                    <div class="question-title">3. 法人名</div>
+                    <div class="question-input">
+                        <input type="text" class="form-control" data-field="companyName" placeholder="法人名">
+                    </div>
+                </div>
+                
+                <div class="question-row">
+                    <div class="question-title">4. 審査者</div>
+                    <div class="question-input">
+                        <input type="text" class="form-control" data-field="reviewer" placeholder="審査者">
+                    </div>
+                </div>
+                
+                <div class="question-row">
+                    <div class="question-title">5. 最終更新日時</div>
+                    <div class="question-input">
+                        <input type="text" class="form-control" data-field="lastUpdateDate" readonly placeholder="yyyy/mm/dd hh:mm">
+                    </div>
+                </div>
+                
+                <div class="question-row">
+                    <div class="question-title">6. 承諾可否</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="approvalStatus" value="承諾" data-field="approvalStatus" id="approval-yes">
+                                <label for="approval-yes">承諾</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="approvalStatus" value="謝絶" data-field="approvalStatus" id="approval-no">
+                                <label for="approval-no">謝絶</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="approvalStatus" value="取下" data-field="approvalStatus" id="approval-withdraw">
+                                <label for="approval-withdraw">取下</label>
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="basic-info_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'basic-info_image')"></textarea>
+                            <div class="image-thumbnails" data-images="basic-info_image">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 申込情報セクション -->
+        <div class="section">
+            <div class="section-header">申込情報</div>
+            <div class="section-content">
+                <div class="question-row">
+                    <div class="question-title">1. ANZUと登記簿謄本の法人名・住所、代表者名・住所表記が一致している（英文表記も確認）※一致していない場合は取下げ</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="nameAddressMatch" value="はい" data-field="nameAddressMatch" id="name-match-yes">
+                                <label for="name-match-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="nameAddressMatch" value="いいえ" data-field="nameAddressMatch" id="name-match-no">
+                                <label for="name-match-no">いいえ</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q1_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q1_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row">
+                    <div class="question-title">2. 初回申込 or 途上申込</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="applicationType" value="初回申込" data-field="applicationType" id="first-app" onchange="updateDynamicFields()">
+                                <label for="first-app">初回申込</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="applicationType" value="途上申込" data-field="applicationType" id="ongoing-app" onchange="updateDynamicFields()">
+                                <label for="ongoing-app">途上申込</label>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="changeContentQuestion" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">変更内容が以下のいずれかである。（利用目的、取引金額、取引件数）</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="changeContent" value="はい" data-field="changeContent" id="change-yes" onchange="updateDynamicFields()">
+                                    <label for="change-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="changeContent" value="いいえ" data-field="changeContent" id="change-no" onchange="updateDynamicFields()">
+                                    <label for="change-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q2_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q2_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q2_image"></div>
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q3">
+                    <div class="question-title">3. 申込企業がアムレン対象先ではない</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="notAmren" value="はい" data-field="notAmren" id="not-amren-yes">
+                                <label for="not-amren-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="notAmren" value="いいえ" data-field="notAmren" id="not-amren-no">
+                                <label for="not-amren-no">いいえ</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q3_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q3_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q3_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q4">
+                    <div class="question-title">4. 申込企業が暗号資産交換業者ではない</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="notCryptoExchange" value="はい" data-field="notCryptoExchange" id="not-crypto-yes" onchange="updateDynamicFields()">
+                                <label for="not-crypto-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="notCryptoExchange" value="いいえ" data-field="notCryptoExchange" id="not-crypto-no" onchange="updateDynamicFields()">
+                                <label for="not-crypto-no">いいえ</label>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="cryptoQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">USD・JPYは取り扱いができないことについて顧客了承を得た</div>
+                            <div class="radio-group" style="margin-bottom: 8px;">
+                                <div class="radio-item">
+                                    <input type="radio" name="cryptoUsdJpyConsent" value="はい" data-field="cryptoUsdJpyConsent" id="crypto-consent-yes">
+                                    <label for="crypto-consent-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="cryptoUsdJpyConsent" value="いいえ" data-field="cryptoUsdJpyConsent" id="crypto-consent-no">
+                                    <label for="crypto-consent-no">いいえ</label>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 12px; margin-bottom: 6px;">【別紙2】外貨送金サービス_事前登録届出書を受領した</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="cryptoRegistrationReceived" value="はい" data-field="cryptoRegistrationReceived" id="crypto-reg-yes">
+                                    <label for="crypto-reg-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="cryptoRegistrationReceived" value="いいえ" data-field="cryptoRegistrationReceived" id="crypto-reg-no">
+                                    <label for="crypto-reg-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q4_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q4_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q4_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q5">
+                    <div class="question-title">5. 資料にて事業実態を確認できる</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="businessVerified" value="はい" data-field="businessVerified" id="business-verified-yes">
+                                <label for="business-verified-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="businessVerified" value="いいえ" data-field="businessVerified" id="business-verified-no">
+                                <label for="business-verified-no">いいえ</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q5_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q5_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q5_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q6">
+                    <div class="question-title">6. 申込企業が取引不能業者にあたらない（公序良俗に反する商品・サービスの提供、ギャンブル・懸賞サイト、結婚紹介・出会い系サイト、ネットワークビジネス、送金代行・収納代行）</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="notProhibited" value="はい" data-field="notProhibited" id="not-prohibited-yes">
+                                <label for="not-prohibited-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="notProhibited" value="いいえ" data-field="notProhibited" id="not-prohibited-no">
+                                <label for="not-prohibited-no">いいえ</label>
+                            </div>
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label>事業内容</label>
+                            <input type="text" class="form-control" data-field="businessContent" placeholder="事業内容">
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q6_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q6_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q6_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q7">
+                    <div class="question-title">7. 申込企業が旅行業/医薬品化粧品の販売/人材派遣紹介業/不動産売買業を行っていない</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="notRegulatedBusiness" value="はい" data-field="notRegulatedBusiness" id="not-regulated-yes" onchange="updateDynamicFields()">
+                                <label for="not-regulated-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="notRegulatedBusiness" value="いいえ" data-field="notRegulatedBusiness" id="not-regulated-no" onchange="updateDynamicFields()">
+                                <label for="not-regulated-no">いいえ</label>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="licenseQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">事業許認可や免許が資料で確認できる</div>
+                            <div class="radio-group" style="margin-bottom: 8px;">
+                                <div class="radio-item">
+                                    <input type="radio" name="businessLicense" value="はい" data-field="businessLicense" id="license-yes">
+                                    <label for="license-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="businessLicense" value="いいえ" data-field="businessLicense" id="license-no">
+                                    <label for="license-no">いいえ</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="businessLicense" value="不要" data-field="businessLicense" id="license-na">
+                                    <label for="license-na">不要</label>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>許認可名</label>
+                                <input type="text" class="form-control" data-field="licenseType" placeholder="許認可名">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q7_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q7_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q7_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q8">
+                    <div class="question-title">8. SimpleCheckで、下記風評のリスクがない（行政処分、マネロン、詐欺、マルチ、不正受給、脱税、出入国管理・難民認定法違反、指名停止、景表法違反、性犯罪、ほか窃盗等金融絡みの犯罪）</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="noReputationRisk" value="はい" data-field="noReputationRisk" id="no-reputation-risk-yes">
+                                <label for="no-reputation-risk-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="noReputationRisk" value="いいえ" data-field="noReputationRisk" id="no-reputation-risk-no">
+                                <label for="no-reputation-risk-no">いいえ</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q8_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q8_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q8_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row" data-dynamic="applicant_q9">
+                    <div class="question-title">9. ネット検索で、申込企業の北朝鮮迂回リスクがない（検索ワード：法人名＋朝鮮、法人名＋迂回）</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="noNorthKoreaRisk" value="はい" data-field="noNorthKoreaRisk" id="no-nk-risk-yes">
+                                <label for="no-nk-risk-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="noNorthKoreaRisk" value="いいえ" data-field="noNorthKoreaRisk" id="no-nk-risk-no">
+                                <label for="no-nk-risk-no">いいえ</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="applicant_q9_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'applicant_q9_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q9_image"></div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 取引内容セクション（アコーディオン） -->
+        <div id="transactionSections">
+            <!-- 取引内容1 -->
+            <div class="accordion" data-section="1">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>取引内容1</span>
+                    <span class="accordion-toggle">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="question-row">
+                        <div class="question-title">1. 外貨送金か外貨受取か</div>
+                        <div class="question-input">
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="transactionType_1" value="外貨送金" data-field="transactionType_1" id="type-send-1">
+                                    <label for="type-send-1">外貨送金</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="transactionType_1" value="外貨受取" data-field="transactionType_1" id="type-receive-1">
+                                    <label for="type-receive-1">外貨受取</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q1_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q1_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q1_1_image"></div>
+                            
+                        </div>
+                    </div>
+
+                    <div class="question-row" data-dynamic="transaction_q2_1">
+                        <div class="question-title">2. 前払い等で輸入許可通知書が確認できない場合は、管理シートに記入した</div>
+                        <div class="question-input">
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="managementSheetFilled_1" value="はい" data-field="managementSheetFilled_1" id="mgmt-yes-1">
+                                    <label for="mgmt-yes-1">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="managementSheetFilled_1" value="いいえ" data-field="managementSheetFilled_1" id="mgmt-no-1">
+                                    <label for="mgmt-no-1">いいえ</label>
+                                </div>
+                            </div>
+                            <div class="input-group" style="margin-top: 8px;">
+                                <label>提出可能日</label>
+                                <input type="date" class="form-control" data-field="submissionDate_1">
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q2_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q2_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q2_1_image"></div>
+                            
+                        </div>
+                    </div>
+
+                    <div class="question-row" data-dynamic="transaction_q3_1">
+                        <div class="question-title">3. 取引目的が申込企業の謄本記載の事業内容と関連性がある。</div>
+                        <div class="question-input">
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="transactionPurposeRelated_1" value="はい" data-field="transactionPurposeRelated_1" id="purpose-yes-1">
+                                    <label for="purpose-yes-1">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="transactionPurposeRelated_1" value="いいえ" data-field="transactionPurposeRelated_1" id="purpose-no-1">
+                                    <label for="purpose-no-1">いいえ</label>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>取引目的・品目</label>
+                                <input type="text" class="form-control" data-field="transactionPurposeItems_1" placeholder="取引目的・品目">
+                            </div>                            
+                            <div class="nested-question">
+                                <div style="font-size: 12px; margin-bottom: 6px;">取引内容が以下にあたらない（火薬品、仮想通貨、大麻、アダルトグッズ、ギャンブル性の高い商品（オンラインカジノ等））</div>
+                                <div class="radio-group" style="margin-bottom: 8px;">
+                                    <div class="radio-item">
+                                        <input type="radio" name="transactionContentSafe_1" value="はい" data-field="transactionContentSafe_1" id="content-safe-yes-1">
+                                        <label for="content-safe-yes-1">はい</label>
+                                    </div>
+                                    <div class="radio-item">
+                                        <input type="radio" name="transactionContentSafe_1" value="いいえ" data-field="transactionContentSafe_1" id="content-safe-no-1">
+                                        <label for="content-safe-no-1">いいえ</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q3_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q3_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q3_1_image"></div>
+                            
+                        </div>
+                    </div>
+
+                    <div class="question-row">
+                        <div class="question-title">4. 取引先企業/関連企業/銀行/積載地/仕向地の所在国・地域が以下A、B、Cに該当しないことを確認する。</div>
+                        <div class="question-input">
+                            <div class="grid-2">
+                                <div class="input-group">
+                                    <label>取引先企業</label>
+                                    <input type="text" class="form-control" data-field="partnerCompany_1" placeholder="取引先企業">
+                                </div>
+                                <div class="input-group">
+                                    <label>関連企業</label>
+                                    <input type="text" class="form-control" data-field="relatedCompany_1" placeholder="関連企業">
+                                </div>
+                                <div class="input-group">
+                                    <label>銀行</label>
+                                    <input type="text" class="form-control" data-field="bank_1" placeholder="銀行">
+                                </div>
+                                <div class="input-group">
+                                    <label>積載地</label>
+                                    <input type="text" class="form-control" data-field="loadingLocation_1" placeholder="積載地">
+                                </div>
+                                <div class="input-group">
+                                    <label>仕向地</label>
+                                    <input type="text" class="form-control" data-field="destination_1" placeholder="仕向地">
+                                </div>
+                            </div>
+                            
+                            <div class="nested-question">
+                                <div style="font-size: 12px; margin-bottom: 6px;">A. 以下に該当しない。※具体的な国名は参考資料シートを参照<br>・北朝鮮・イラン・ロシア・ベラルーシ<br>・外為法第16条第１項～３項に基づく許可の対象となる国、高リスク国（南アフリカ、フィリピン、ベトナム除く）、タックスヘイブン</div>
+                                <div class="radio-group" style="margin-bottom: 8px;">
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckA_1" value="はい" data-field="locationCheckA_1" id="loc-a-yes-1">
+                                        <label for="loc-a-yes-1">はい</label>
+                                    </div>
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckA_1" value="いいえ" data-field="locationCheckA_1" id="loc-a-no-1">
+                                        <label for="loc-a-no-1">いいえ</label>
+                                    </div>
+                                </div>
+                                
+                                <div style="font-size: 12px; margin-bottom: 6px;">B. 中国三省（遼寧省、吉林省、黒竜江省）に該当しない。</div>
+                                <div class="radio-group" style="margin-bottom: 8px;">
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckB_1" value="はい" data-field="locationCheckB_1" id="loc-b-yes-1" onchange="updateLocationFields(1)">
+                                        <label for="loc-b-yes-1">はい</label>
+                                    </div>
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckB_1" value="いいえ" data-field="locationCheckB_1" id="loc-b-no-1" onchange="updateLocationFields(1)">
+                                        <label for="loc-b-no-1">いいえ</label>
+                                    </div>
+                                </div>
+                                
+                                <div id="chinaQuestion_1" style="display: none; margin-left: 16px; margin-bottom: 8px;">
+                                    <div style="font-size: 12px; margin-bottom: 6px;">取引品目が北朝鮮特産品にあたらない（海産物、サルトリイバラの葉など）</div>
+                                    <div class="radio-group">
+                                        <div class="radio-item">
+                                            <input type="radio" name="notNKSpecialty_1" value="はい" data-field="notNKSpecialty_1" id="nk-specialty-yes-1">
+                                            <label for="nk-specialty-yes-1">はい</label>
+                                        </div>
+                                        <div class="radio-item">
+                                            <input type="radio" name="notNKSpecialty_1" value="いいえ" data-field="notNKSpecialty_1" id="nk-specialty-no-1">
+                                            <label for="nk-specialty-no-1">いいえ</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="font-size: 12px; margin-bottom: 6px;">C. 中東地域に該当しない。（アフガニスタン、アラブ首長国連邦、イエメン、イスラエル、イラク、イラン、オマーン、カタール、クウェート、サウジアラビア、シリア、トルコ、バーレーン、ヨルダン、レバノン）</div>
+                                <div class="radio-group" style="margin-bottom: 8px;">
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckC_1" value="はい" data-field="locationCheckC_1" id="loc-c-yes-1" onchange="updateLocationFields(1)">
+                                        <label for="loc-c-yes-1">はい</label>
+                                    </div>
+                                    <div class="radio-item">
+                                        <input type="radio" name="locationCheckC_1" value="いいえ" data-field="locationCheckC_1" id="loc-c-no-1" onchange="updateLocationFields(1)">
+                                        <label for="loc-c-no-1">いいえ</label>
+                                    </div>
+                                </div>
+                                
+                                <div id="middleEastQuestion_1" style="display: none; margin-left: 16px;">
+                                    <div style="font-size: 12px; margin-bottom: 6px;">取引品目が「中古車」ではない</div>
+                                    <div class="radio-group">
+                                        <div class="radio-item">
+                                            <input type="radio" name="notUsedCar_1" value="はい" data-field="notUsedCar_1" id="used-car-yes-1">
+                                            <label for="used-car-yes-1">はい</label>
+                                        </div>
+                                        <div class="radio-item">
+                                            <input type="radio" name="notUsedCar_1" value="いいえ" data-field="notUsedCar_1" id="used-car-no-1">
+                                            <label for="used-car-no-1">いいえ</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q4_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q4_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q4_1_image"></div>
+                            
+                        </div>
+                    </div>
+
+                    <div class="question-row" data-dynamic="transaction_q5_1">
+                        <div class="question-title">5. 取引先が取引不能業者にあたらない（公序良俗に反する商品・サービスの提供、ギャンブル・懸賞サイト、結婚紹介・出会い系サイト、ネットワークビジネス、送金代行・収納代行）</div>
+                        <div class="question-input">
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="partnerNotProhibited_1" value="はい" data-field="partnerNotProhibited_1" id="partner-ok-yes-1">
+                                    <label for="partner-ok-yes-1">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="partnerNotProhibited_1" value="いいえ" data-field="partnerNotProhibited_1" id="partner-ok-no-1">
+                                    <label for="partner-ok-no-1">いいえ</label>
+                                </div>
+                            </div>
+                            <div class="input-group" style="margin-top: 8px;">
+                                <label>取引先事業内容</label>
+                                <input type="text" class="form-control" data-field="partnerBusinessContent_1" placeholder="取引先事業内容">
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q5_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q5_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q5_1_image"></div>
+                            
+                        </div>
+                    </div>
+
+                    <div class="question-row" data-dynamic="transaction_q6_1">
+                        <div class="question-title">6. ネット検索で、送金先または送金元の企業（個人）の風評に問題がない<br>検索ワード：法人名＋朝鮮、法人名＋迂回、法人名＋詐欺、法人名＋裁判</div>
+                        <div class="question-input">
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="noPartnerReputationRisk_1" value="はい" data-field="noPartnerReputationRisk_1" id="partner-rep-yes-1">
+                                    <label for="partner-rep-yes-1">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="noPartnerReputationRisk_1" value="いいえ" data-field="noPartnerReputationRisk_1" id="partner-rep-no-1">
+                                    <label for="partner-rep-no-1">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="remarks-section">
+                            
+                            <textarea class="remarks-textarea" data-field="transaction_q6_1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q6_1_image')"></textarea>
+                            <div class="image-thumbnails" data-images="transaction_q6_1_image"></div>
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 取引内容2-5も同様の構造 -->
+            <div class="accordion" data-section="2">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>取引内容2</span>
+                    <span class="accordion-toggle">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <!-- 取引内容2の質問項目（1と同じ構造で、IDと名前を_2に変更） -->
+                    <!-- 簡潔化のため詳細は省略し、JavaScript側で動的生成 -->
+                </div>
+            </div>
+
+            <div class="accordion" data-section="3">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>取引内容3</span>
+                    <span class="accordion-toggle">▼</span>
+                </div>
+                <div class="accordion-content"></div>
+            </div>
+
+            <div class="accordion" data-section="4">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>取引内容4</span>
+                    <span class="accordion-toggle">▼</span>
+                </div>
+                <div class="accordion-content"></div>
+            </div>
+
+            <div class="accordion" data-section="5">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>取引内容5</span>
+                    <span class="accordion-toggle">▼</span>
+                </div>
+                <div class="accordion-content"></div>
+            </div>
+        </div>
+
+        <!-- 税務申告・決算書セクション -->
+        <div class="section">
+            <div class="section-header">税務申告・決算書</div>
+            <div class="section-content" data-dynamic="tax-section">
+                <div class="question-row">
+                    <div class="question-title">1. 創業1年以上 or 創業1年未満</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="businessAge" value="1年以上" data-field="businessAge" id="age-over" onchange="updateBusinessAgeFields()">
+                                <label for="age-over">1年以上</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="businessAge" value="1年未満" data-field="businessAge" id="age-under" onchange="updateBusinessAgeFields()">
+                                <label for="age-under">1年未満</label>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="businessOver1YearQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">税務申告完了を確認できる</div>
+                            <div class="radio-group" style="margin-bottom: 8px;">
+                                <div class="radio-item">
+                                    <input type="radio" name="taxReturnCompleted" value="はい" data-field="taxReturnCompleted" id="tax-yes">
+                                    <label for="tax-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="taxReturnCompleted" value="いいえ" data-field="taxReturnCompleted" id="tax-no">
+                                    <label for="tax-no">いいえ</label>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 12px; margin-bottom: 6px;">決算書類受領済みか（貸借対照表・損益計算書）</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="financialStatementsReceived" value="はい" data-field="financialStatementsReceived" id="financial-yes">
+                                    <label for="financial-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="financialStatementsReceived" value="いいえ" data-field="financialStatementsReceived" id="financial-no">
+                                    <label for="financial-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="businessUnder1YearQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">以下のABいずれかを受領している<br>A：売上と仕入にかかる台帳・帳簿（税理士・会計士の署名付）<br>B：売上と仕入にかかる台帳・帳簿 ＋ メインバンクの入出金明細（売上と仕入の入出金が確認可）</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="ledgerReceived" value="はい" data-field="ledgerReceived" id="ledger-yes">
+                                    <label for="ledger-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="ledgerReceived" value="いいえ" data-field="ledgerReceived" id="ledger-no">
+                                    <label for="ledger-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="tax_q1_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'tax_q1_image')"></textarea>
+                        <div class="image-thumbnails" data-images="tax_q1_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row">
+                    <div class="question-title">2. 疎明資料の金額と申告金額に大きな乖離がない</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="amountDiscrepancyNone" value="はい" data-field="amountDiscrepancyNone" id="discrepancy-yes">
+                                <label for="discrepancy-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="amountDiscrepancyNone" value="いいえ" data-field="amountDiscrepancyNone" id="discrepancy-no">
+                                <label for="discrepancy-no">いいえ</label>
+                            </div>
+                        </div>
+                        <div class="grid-2" style="margin-top: 8px;">
+                            <div class="input-group">
+                                <label>疎明資料金額（万円）</label>
+                                <input type="number" class="form-control" data-field="evidenceAmount" placeholder="金額">
+                            </div>
+                            <div class="input-group">
+                                <label>1件あたり申告金額</label>
+                                <input type="number" class="form-control" data-field="declaredAmountPerCase" placeholder="金額">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="tax_q2_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'tax_q2_image')"></textarea>
+                        <div class="image-thumbnails" data-images="tax_q2_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row">
+                    <div class="question-title">3. 取引目的をA、B、Cから確認し、取引規模の妥当性を確認する。</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="transactionScale" value="A" data-field="transactionScale" id="scale-a" onchange="updateTransactionScaleFields()">
+                                <label for="scale-a">A</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="transactionScale" value="B" data-field="transactionScale" id="scale-b" onchange="updateTransactionScaleFields()">
+                                <label for="scale-b">B</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="transactionScale" value="C" data-field="transactionScale" id="scale-c" onchange="updateTransactionScaleFields()">
+                                <label for="scale-c">C</label>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="scaleAQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">有形・無形商材の売買/仲介貿易<br>疎明資料の金額が以下と比較して超過しない。<br>比較対象：売上高、現預金</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleAAmountValid" value="はい" data-field="scaleAAmountValid" id="scale-a-yes">
+                                    <label for="scale-a-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleAAmountValid" value="いいえ" data-field="scaleAAmountValid" id="scale-a-no">
+                                    <label for="scale-a-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="scaleBQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">自社口座、関連企業間の取引/売買以外の取引/不動産関連<br>疎明資料の金額が以下と比較して超過しない。<br>比較対象：有価証券、不動産、売上</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleBAmountValid" value="はい" data-field="scaleBAmountValid" id="scale-b-yes">
+                                    <label for="scale-b-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleBAmountValid" value="いいえ" data-field="scaleBAmountValid" id="scale-b-no">
+                                    <label for="scale-b-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="nested-question" id="scaleCQuestions" style="display: none;">
+                            <div style="font-size: 12px; margin-bottom: 6px;">出資、借入、資産運用等<br>疎明資料の金額が以下と比較して超過しない。<br>比較対象：売上高、現預金</div>
+                            <div class="radio-group" style="margin-bottom: 8px;">
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleCAmountValid" value="はい" data-field="scaleCAmountValid" id="scale-c-amount-yes">
+                                    <label for="scale-c-amount-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleCAmountValid" value="いいえ" data-field="scaleCAmountValid" id="scale-c-amount-no">
+                                    <label for="scale-c-amount-no">いいえ</label>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 12px; margin-bottom: 6px;">申告の送金額と送金頻度が以下と比較して金額・頻度を超過しない<br>比較対象：疎明資料（契約書など）に記載の内容</div>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleCFrequencyValid" value="はい" data-field="scaleCFrequencyValid" id="scale-c-freq-yes">
+                                    <label for="scale-c-freq-yes">はい</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" name="scaleCFrequencyValid" value="いいえ" data-field="scaleCFrequencyValid" id="scale-c-freq-no">
+                                    <label for="scale-c-freq-no">いいえ</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="tax_q3_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'tax_q3_image')"></textarea>
+                        <div class="image-thumbnails" data-images="tax_q3_image"></div>
+                        
+                    </div>
+                </div>
+
+                <div class="question-row">
+                    <div class="question-title">4. 疎明資料やヒアリングより送金原資が特定できている</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="remittanceSourceIdentified" value="はい" data-field="remittanceSourceIdentified" id="source-yes">
+                                <label for="source-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="remittanceSourceIdentified" value="いいえ" data-field="remittanceSourceIdentified" id="source-no">
+                                <label for="source-no">いいえ</label>
+                            </div>
+                        </div>
+                        <div class="input-group" style="margin-top: 8px;">
+                            <label>送金原資</label>
+                            <input type="text" class="form-control" data-field="remittanceSource" placeholder="送金原資">
+                        </div>
+                    </div>
+                    <div class="remarks-section">
+                        
+                        <textarea class="remarks-textarea" data-field="tax_q4_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'tax_q4_image')"></textarea>
+                        <div class="image-thumbnails" data-images="tax_q4_image"></div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 画像拡大モーダル -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <div class="modal-content">
+            <img class="modal-image" id="modalImage" onclick="event.stopPropagation()">
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
