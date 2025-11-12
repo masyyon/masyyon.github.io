@@ -216,6 +216,11 @@ body {
     justify-content: center;
 }
 
+.image-remove.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .image-thumbnail:hover .image-remove {
     display: flex;
 }
@@ -245,6 +250,13 @@ body {
 
 .accordion-header:hover {
     background: var(--muted);
+}
+
+.accordion-header.strong {
+  font-weight: bold;
+  color: #009fae;         /* シアン */
+  background: #e6faff;    /* 薄いシアン背景 */
+  text-decoration: underline;
 }
 
 .accordion-content {
@@ -339,6 +351,28 @@ input[type="radio"]:disabled:checked + label {
   opacity: 1;
   /* 必要に応じてpadding追加 */
   padding: 2px 8px;
+}
+
+/* エラー表示：行単位（question-row）に .error が付いている場合はタイトルを強調 */
+.question-row.error .question-title {
+  color: var(--destructive);
+  font-weight: 700;
+  background: rgba(212,24,61,0.06);
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+/* 個別要素に付くエラー（まれなケース） */
+.field-error {
+  border: 2px solid #d4183d;
+  background: #fff0f0;
+}
+
+/* 備考欄はエラー時でも元の見た目を維持 */
+.question-row.error .remarks-section .remarks-textarea,
+.field-error[type="textarea"] {
+  border: 1px solid var(--border);
+  background: white;
 }
 
 /* レスポンシブ */
