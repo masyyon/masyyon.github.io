@@ -8,6 +8,16 @@ document.addEventListener('DOMContentLoaded', function() {
     generateTransactionSections();
     bindEvents();
     updateDynamicFields();
+
+    const saveButton = document.getElementById('saveButton');
+    if (saveButton) {
+        saveButton.addEventListener('click', saveToJSON);
+    }
+
+    const staticHTMLButton = document.getElementById('staticHTMLButton');
+    if (staticHTMLButton) {
+        staticHTMLButton.addEventListener('click', saveToStaticHTML);
+    }
 });
 
 // 最終更新日時を更新
@@ -37,18 +47,18 @@ function generateTransactionContent(sectionNum) {
             <div class="question-input">
                 <div class="radio-group">
                     <div class="radio-item">
-                        <input type="radio" name="transactionType_${sectionNum}" value="外貨送金" data-field="transactionType_${sectionNum}" id="type-send-${sectionNum}">
+                        <input type="radio" name="transactionType_${sectionNum}" value="外貨送金" data-field="transactionType_${sectionNum}" id="type-send-${sectionNum}" onchange="updateRemitSourceFields(${sectionNum})">
                         <label for="type-send-${sectionNum}">外貨送金</label>
                     </div>
                     <div class="radio-item">
-                        <input type="radio" name="transactionType_${sectionNum}" value="外貨受取" data-field="transactionType_${sectionNum}" id="type-receive-${sectionNum}">
+                        <input type="radio" name="transactionType_${sectionNum}" value="外貨受取" data-field="transactionType_${sectionNum}" id="type-receive-${sectionNum}" onchange="updateRemitSourceFields(${sectionNum})">
                         <label for="type-receive-${sectionNum}">外貨受取</label>
                     </div>
                 </div>
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q1_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q1_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q1_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q1_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q1_${sectionNum}_image"></div>
                 
             </div>
@@ -59,22 +69,26 @@ function generateTransactionContent(sectionNum) {
             <div class="question-input">
                 <div class="radio-group">
                     <div class="radio-item">
-                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="はい" data-field="managementSheetFilled_${sectionNum}" id="mgmt-yes-${sectionNum}">
+                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="はい" data-field="managementSheetFilled_${sectionNum}" id="mgmt-yes-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
                         <label for="mgmt-yes-${sectionNum}">はい</label>
                     </div>
                     <div class="radio-item">
-                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="いいえ" data-field="managementSheetFilled_${sectionNum}" id="mgmt-no-${sectionNum}">
+                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="いいえ" data-field="managementSheetFilled_${sectionNum}" id="mgmt-no-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
                         <label for="mgmt-no-${sectionNum}">いいえ</label>
                     </div>
+                    <div class="radio-item">
+                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="前払いでないため不要" data-field="managementSheetFilled_${sectionNum}" id="mgmt-unnecessary-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
+                        <label for="mgmt-unnecessary-${sectionNum}">前払いでないため不要</label>
+                    </div>
                 </div>
-                <div class="input-group" style="margin-top: 8px;">
+                <div id="submissionDateInput_${sectionNum}" class="input-group" style="display: none; margin-top: 8px;">
                     <label>提出可能日</label>
                     <input type="date" class="form-control" data-field="submissionDate_${sectionNum}">
                 </div>
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q2_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q2_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q2_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q2_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q2_${sectionNum}_image"></div>
                 
             </div>
@@ -95,7 +109,7 @@ function generateTransactionContent(sectionNum) {
                 </div>
                 <div class="input-group">
                     <label>取引目的・品目</label>
-                    <input type="text" class="form-control" data-field="transactionPurposeItems_1" placeholder="取引目的・品目">
+                    <input type="text" class="form-control" data-field="transactionPurposeItems_${sectionNum}" placeholder="取引目的・品目">
                 </div>                           
                 <div class="nested-question">
                     <div style="font-size: 12px; margin-bottom: 6px;">取引内容が以下にあたらない（火薬品、仮想通貨、大麻、アダルトグッズ、ギャンブル性の高い商品（オンラインカジノ等））</div>
@@ -113,7 +127,7 @@ function generateTransactionContent(sectionNum) {
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q3_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q3_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q3_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q3_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q3_${sectionNum}_image"></div>
                 
             </div>
@@ -213,7 +227,7 @@ function generateTransactionContent(sectionNum) {
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q4_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q4_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q4_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q4_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q4_${sectionNum}_image"></div>
                 
             </div>
@@ -239,7 +253,7 @@ function generateTransactionContent(sectionNum) {
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q5_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q5_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q5_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q5_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q5_${sectionNum}_image"></div>
                 
             </div>
@@ -261,7 +275,7 @@ function generateTransactionContent(sectionNum) {
             </div>
             <div class="remarks-section">
                 
-                <textarea class="remarks-textarea" data-field="transaction_q6_${sectionNum}_comment" placeholder="備考（画像ペースト可）" onpaste="handlePaste(event, 'transaction_q6_${sectionNum}_image')"></textarea>
+                <textarea class="remarks-textarea" data-field="transaction_q6_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q6_${sectionNum}_image')"></textarea>
                 <div class="image-thumbnails" data-images="transaction_q6_${sectionNum}_image"></div>
                 
             </div>
@@ -269,18 +283,32 @@ function generateTransactionContent(sectionNum) {
     `;
 }
 
+// 疎明資料金額（万円）をカンマ区切りにする
+function formatEvidenceAmount(element) {
+    if (element.value) {
+        let raw = element.value.replace(/,/g, '').replace(/[^\d]/g, '');
+        if (raw) {
+            element.value = Number(raw).toLocaleString();
+            formData[element.dataset.field] = raw;
+        } else {
+            element.value = '';
+            formData[element.dataset.field] = '';
+        }
+    }
+}
+
 // イベントバインド
 function bindEvents() {
     document.querySelectorAll('[data-field]').forEach(element => {
-        element.addEventListener('input', function() {
+        const handler = function() {
             formData[this.dataset.field] = this.value;
             updateLastUpdateDate();
-        });
-        
-        element.addEventListener('change', function() {
-            formData[this.dataset.field] = this.value;
-            updateLastUpdateDate();
-        });
+            if (this.dataset.field === 'evidenceAmount') {
+                formatEvidenceAmount(this);
+            }
+        };
+        element.addEventListener('input', handler);
+        element.addEventListener('change', handler);
     });
 }
 
@@ -290,7 +318,7 @@ function updateDynamicFields() {
     const isOngoing = formData.applicationType === '途上申込';
     const changeContentQuestion = document.getElementById('changeContentQuestion');
     if (changeContentQuestion) {
-        changeContentQuestion.style.display = isOngoing ? 'block' : 'none';
+        changeContentQuestion.style.display = isOngoing ? 'block': 'none';
     }
 
     // 変更内容がいいえの場合の非活性化
@@ -349,6 +377,17 @@ function updateDynamicFields() {
     }
 }
 
+// 提出可能日の動的制御
+function updateSubmissionDateFields(sectionNum) {
+    const managementSheetValue = formData[`managementSheetFilled_${sectionNum}`] === 'はい';
+
+    const submissionDateInputDiv = document.getElementById(`submissionDateInput_${sectionNum}`);
+    
+    if (submissionDateInputDiv) {
+        submissionDateInputDiv.style.display = managementSheetValue ? 'block' : 'none';
+    }
+}
+
 // 地域チェック関連の動的制御
 function updateLocationFields(sectionNum) {
     const isChinaNo = formData[`locationCheckB_${sectionNum}`] === 'いいえ';
@@ -396,10 +435,42 @@ function updateTransactionScaleFields() {
     if (scaleCQuestions) scaleCQuestions.style.display = scale === 'C' ? 'block' : 'none';
 }
 
+// 送金原資の動的制御
+function updateRemitSourceFields() {
+    let hasRemit = false;
+    for (let i = 1; i <= 5; i++) {
+        if (formData[`transactionType_${i}`] === '外貨送金') {
+        hasRemit = true;
+        break;
+        }
+    }
+    const remittanceSourceDiv = document.getElementById('remittanceSourceQuestion');
+    if (remittanceSourceDiv) {
+        if(hasRemit){
+            remittanceSourceDiv.classList.remove('disabled');
+        }
+        else{
+            remittanceSourceDiv.classList.add('disabled');
+        }
+    }
+}
+
 // アコーディオン
 function toggleAccordion(header) {
     const accordion = header.parentElement;
     accordion.classList.toggle('open');
+}
+
+// 取引内容に数だけアコーディオン強調
+function updateTransactionHeaderHighlight() {
+  const count = formData[`transactionCount`] || 1;
+  document.querySelectorAll('#transactionSections .accordion-header').forEach((header, idx) => {
+    if (idx < count) {
+      header.classList.add('strong');
+    } else {
+      header.classList.remove('strong');
+    }
+  });
 }
 
 // 画像処理
@@ -446,7 +517,7 @@ function displayImages(fieldName) {
         thumbnail.className = 'image-thumbnail';
         thumbnail.innerHTML = `
             <img src="${imageSrc}" alt="画像 ${index + 1}" onclick="showModal('${imageSrc}')">
-            <button class="image-remove" onclick="removeImage('${fieldName}', ${index})">×</button>
+            <button type="button" class="image-remove" onclick="removeImage('${fieldName}', ${index})">×</button>
         `;
         container.appendChild(thumbnail);
     });
@@ -474,8 +545,76 @@ function closeModal() {
     modal.classList.remove('show');
 }
 
+// 必須項目バリデーション
+function validateRequiredFields() {
+  let isValid = true;
+  let firstError = null;
+
+  // 既存のエラー表示をクリア
+  document.querySelectorAll('.error, .field-error').forEach(el => el.classList.remove('error', 'field-error'));
+
+  // 必須チェック対象（備考は除外）
+  const fields = Array.from(document.querySelectorAll('[data-field]'))
+    .filter(el => !(el.getAttribute('data-field') || '').endsWith('_comment'));
+
+  for (const el of fields) {
+    // 非活性・非表示はスキップ
+    if (el.closest('.disabled')) continue;
+    if (el.offsetParent === null) continue;
+
+    // アコーディオンで閉じている場合はスキップ
+    const accordion = el.closest('.accordion');
+    if (accordion && !accordion.classList.contains('open')) continue;
+
+    const questionRow = el.closest('.question-row');
+
+    if (el.type === 'radio') {
+      // 同名グループを重複チェックしないため、グループの先頭要素のみ処理
+      const firstOfGroup = document.querySelector(`input[name="${el.name}"]`);
+      if (firstOfGroup !== el) continue;
+
+      const checked = document.querySelector(`input[name="${el.name}"]:checked`);
+      if (!checked) {
+        isValid = false;
+        if (!firstError) firstError = el;
+        if (questionRow) questionRow.classList.add('error');
+        else el.classList.add('field-error');
+      }
+    } else {
+      // テキスト系・select の空チェック
+      const val = (el.value || '').toString().trim();
+      if (val === '') {
+        isValid = false;
+        if (!firstError) firstError = el;
+        if (questionRow) questionRow.classList.add('error');
+        else el.classList.add('field-error');
+      }
+    }
+  }
+
+  if (!isValid) {
+    if (firstError) firstError.focus();
+  }
+
+  return isValid;
+}
+
 // JSON保存・読み込み
 function saveToJSON() {
+    // バリデーション実行（関数が存在する場合）
+    let isValid = true;
+    if (typeof validateRequiredFields === "function") {
+        isValid = validateRequiredFields();
+    }
+
+    // バリデーションNGでも保存を許可するか確認
+    if (!isValid) {
+        const proceed = confirm('未入力の必須項目があります。エラーを無視して保存しますか？');
+        if (!proceed) {
+            return; // 保存中止
+        }
+    }
+    
     const allData = {
         formData: formData,
         imageData: imageData,
@@ -484,20 +623,93 @@ function saveToJSON() {
     const dataStr = JSON.stringify(allData, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
-    const exportFileDefaultName = `checksheet_${new Date().getTime()}.json`;
-    
+    let receptionDate = formData.receptionDate || 'noDate';
+    receptionDate = receptionDate.replace(/-/g, '');
+    let companyName = formData.companyName || 'noName';
+
+    const exportFileDefaultName = `${receptionDate}_${companyName}.json`;
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
 }
 
-//編集モード切替用関数
+// 静的HTML保存
+function saveToStaticHTML() {
+    const clone = document.documentElement.cloneNode(true);
+
+    // 不要な要素を削除
+    clone.querySelectorAll('script, style, button, .btn').forEach(el => el.remove());
+
+    // フォーム要素を静的なテキストに置き換える
+    clone.querySelectorAll('input, textarea, select').forEach(el => {
+
+    if (el.type === 'radio') {
+        if (el.checked) {
+            // checked の radio のみ表示
+            // labelのテキストも取得
+            const label = clone.querySelector(`label[for="${el.id}"]`);
+            const span = document.createElement('span');
+            if (label) {
+                span.textContent = label.textContent;
+                label.remove(); // labelはspanに置き換えるので削除
+            } else {
+                
+            }
+            el.replaceWith(span);
+        } else {
+            // 未選択の radio と label は削除
+            const label = clone.querySelector(`label[for="${el.id}"]`);
+            el.remove();
+            if (label) label.remove();
+        }
+    } else if (el.type === 'checkbox') {
+        const span = document.createElement('span');
+        span.textContent = el.checked ? '✔' : '✘';
+        el.replaceWith(span);
+    } else if (el.tagName.toLowerCase() === 'select') {
+        // selectタグの場合、選択されているoptionの表示テキストを出力
+        const selectedOption = el.options[el.selectedIndex];
+        const span = document.createElement('span');
+        span.textContent = selectedOption ? selectedOption.text : '';
+        el.replaceWith(span);
+    } else {
+        const span = document.createElement('span');
+        span.textContent = el.value;
+        el.replaceWith(span);
+    }
+    });
+
+    // 保存用HTMLを生成
+    let receptionDate = formData.receptionDate || 'noDate';
+    receptionDate = receptionDate.replace(/-/g, '');
+    let companyName = formData.companyName || 'noName';
+
+    const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${receptionDate}_${companyName}.html`;
+    a.click();
+}
+
+//編集モード切替用関数setAll
 function setAllFieldsDisabled(disabled) {
   document.querySelectorAll('input, textarea, select, button[data-disable-target]').forEach(el => {
     // 編集ボタンやJSON保存/読み込みボタンは除外
     if (el.id === 'editButton' || el.type === 'file' || el.classList.contains('btn')) return;
     el.disabled = disabled;
+  });
+  
+  // 画像削除ボタンも対象にする
+  document.querySelectorAll('.image-remove').forEach(btn => {
+    if (disabled) {
+        btn.classList.add('disabled');
+        btn.setAttribute('disabled', 'disabled'); // ← 追加
+    } else {
+        btn.classList.remove('disabled');
+        btn.removeAttribute('disabled'); // ← 追加
+    }
   });
 }
 
@@ -540,10 +752,13 @@ function loadFromJSON(event) {
                     updateDynamicFields();
                     updateBusinessAgeFields();
                     updateTransactionScaleFields();
+                    updateTransactionHeaderHighlight();
                     
-                    // 地域フィールドを更新
+                    // 提出可能日フィールド、地域フィールド、送金原資フィールドを更新
                     for (let i = 1; i <= 5; i++) {
+                        updateSubmissionDateFields(i)
                         updateLocationFields(i);
+                        updateRemitSourceFields(i)
                     }
                     
                     bindEvents();
