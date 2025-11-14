@@ -448,14 +448,14 @@
                                 <label>1件あたり申告金額</label>
                                 <select class="form-control" data-field="declaredAmountPerCase">                                    
                                     <option value="">選択してください</option>
-                                    <option value="10000">~100(万程度)</option>
-                                    <option value="50000">100~300</option>
-                                    <option value="100000">300~500</option>
-                                    <option value="500000">500~1000</option>
-                                    <option value="1000000">1000~3000</option>
-                                    <option value="1000000">3000~5000</option>
-                                    <option value="1000000">5000~10000</option>
-                                    <option value="other">10000以上</option>
+                                    <option value="~100">~100(万程度)</option>
+                                    <option value="100~300">100~300</option>
+                                    <option value="300~500">300~500</option>
+                                    <option value="500~1000">500~1000</option>
+                                    <option value="1000~3000">1000~3000</option>
+                                    <option value="3000~5000">3000~5000</option>
+                                    <option value="5000~10000">5000~10000</option>
+                                    <option value="10000~">10000以上</option>
                                 </select>
                             </div>
                         </div>
@@ -572,6 +572,7 @@
             <div class="transaction-count-input">
                 <label for="transactionCount">取引内容の数：</label>
                     <select id="transactionCount" data-field="transactionCount" onchange="updateTransactionHeaderHighlight()">
+                        <option value="">選択してください</option>
                         <option value="1">1件</option>
                         <option value="2">2件</option>
                         <option value="3">3件</option>
