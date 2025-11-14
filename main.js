@@ -668,10 +668,16 @@ function saveToStaticHTML() {
         span.textContent = el.checked ? '✔' : '✘';
         el.replaceWith(span);
     } else if (el.tagName.toLowerCase() === 'select') {
-        // selectタグの場合、選択されているoptionの表示テキストを出力
-        const selectedOption = el.options[el.selectedIndex];
+    let displayText = '';
+        if (el.dataset.field && formData[el.dataset.field]) {
+            // formDataに値がある場合はそれを優先
+            displayText = formData[el.dataset.field];
+        } else {
+            const selectedOption = el.options[el.selectedIndex];
+            displayText = selectedOption ? selectedOption.text : '';
+        }
         const span = document.createElement('span');
-        span.textContent = selectedOption ? selectedOption.text : '';
+        span.textContent = displayText;
         el.replaceWith(span);
     } else {
         const span = document.createElement('span');
@@ -679,6 +685,33 @@ function saveToStaticHTML() {
         el.replaceWith(span);
     }
     });
+
+    // モーダルHTMLをbody末尾に追加
+    const modalHTML = `
+    <div id="imageModal" class="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation();">
+        <img id="modalImage" class="modal-image" src="" alt="拡大画像">
+    </div>
+    </div>`;
+    clone.querySelector('body').insertAdjacentHTML('beforeend', modalHTML);
+
+    // インラインJSをbody末尾に追加
+    const inlineScript = document.createElement('script');
+    inlineScript.textContent = `
+    function showModal(imageSrc){document.getElementById('modalImage').src=imageSrc;document.getElementById('imageModal').classList.add('show');}
+    function closeModal(){document.getElementById('imageModal').classList.remove('show');}
+    function toggleAccordion(header){header.parentElement.classList.toggle('open');}
+    document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.image-thumbnail img').forEach(img=>{
+        img.onclick=function(){showModal(this.src);};
+    });
+    document.querySelectorAll('.accordion-header').forEach(header=>{
+        header.onclick=function(){toggleAccordion(this);};
+    });
+    });
+    `;
+    clone.querySelector('body').appendChild(inlineScript);
+
 
     // 保存用HTMLを生成
     let receptionDate = formData.receptionDate || 'noDate';
