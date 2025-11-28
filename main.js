@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const staticHTMLButton = document.getElementById('staticHTMLButton');
     if (staticHTMLButton) {
         staticHTMLButton.addEventListener('click', saveToStaticHTML);
+        staticHTMLButton.addEventListener('click', saveToJSON);
     }
 });
 
@@ -318,7 +319,11 @@ function updateDynamicFields() {
     const isOngoing = formData.applicationType === '途上申込';
     const changeContentQuestion = document.getElementById('changeContentQuestion');
     if (changeContentQuestion) {
-        changeContentQuestion.style.display = isOngoing ? 'block': 'none';
+        if (isOngoing) {
+            changeContentQuestion.classList.remove('hidden');
+        } else {
+            changeContentQuestion.classList.add('hidden');
+        }
     }
 
     // 変更内容がいいえの場合の非活性化
@@ -634,8 +639,12 @@ function saveToJSON() {
     linkElement.click();
 }
 
+function getBaseCSS() {
+  return fetch('css/base.css').then(response => response.text());
+}
+
 // 静的HTML保存
-function saveToStaticHTML() {
+async function saveToStaticHTML() {
     const clone = document.documentElement.cloneNode(true);
 
     // 不要な要素を削除
@@ -685,6 +694,14 @@ function saveToStaticHTML() {
         el.replaceWith(span);
     }
     });
+
+    // <head>に<style>タグでCSSを埋め込む
+    const head = clone.querySelector('head');
+    if (head) {
+        const styleTag = document.createElement('style');
+        styleTag.textContent = await getBaseCSS();
+        head.appendChild(styleTag);
+    }
 
     // モーダルHTMLをbody末尾に追加
     const modalHTML = `
