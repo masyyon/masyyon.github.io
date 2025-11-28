@@ -91,7 +91,7 @@ body {
 
 .question-row {
     display: grid;
-    grid-template-columns: 2fr 3fr 300px;
+    grid-template-columns: 1fr 1fr 300px;
     gap: 12px;
     align-items: start;
     padding: 8px 0;
@@ -146,12 +146,17 @@ body {
 }
 
 .nested-question {
-    margin-left: 20px;
+    margin-left: 10px;
     margin-top: 8px;
     padding: 8px 12px;
     background: var(--muted);
     border-radius: 4px;
     border-left: 3px solid var(--primary);
+    font-size: 12px; /* 親より小さめ */
+}
+
+.nested-question .question-title {
+    font-size: 12px;
 }
 
 .remarks-section {
@@ -169,7 +174,7 @@ body {
     width: 100%;
     min-height: 40px;
     padding: 6px 8px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--primary);
     border-radius: 4px;
     font-size: 12px;
     resize: vertical;
@@ -322,12 +327,7 @@ body {
 }
 
 .hidden {
-    display: none;
-}
-
-/* 基本情報は備考欄なし */
-.basic-info .question-row {
-    grid-template-columns: 2fr 3fr;
+    display: none !important;
 }
 
 /* 縦配置のinput群 */
@@ -371,7 +371,7 @@ input[type="radio"]:disabled:checked + label {
 /* 備考欄はエラー時でも元の見た目を維持 */
 .question-row.error .remarks-section .remarks-textarea,
 .field-error[type="textarea"] {
-  border: 1px solid var(--border);
+  border: 1px solid var(--primary);
   background: white;
 }
 
