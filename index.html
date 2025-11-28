@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>チェックシート</h1>
+            <h1>法人向け外貨送金・外貨受取サービス初期審査チェックシート</h1>
             <div class="button-group">
                 <button class="btn" id="staticHTMLButton">チェックシート確定</button>
                 <button class="btn" id="saveButton">ファイル一時保存</button>
@@ -22,7 +22,7 @@
         <!-- 基本情報セクション -->
         <div class="section">
             <div class="section-header">基本情報</div>
-            <div class="section-content basic-info">
+            <div class="section-content">
                 <div class="question-row">
                     <div class="question-title">1. 受付番号</div>
                     <div class="question-input">
@@ -82,10 +82,10 @@
                                 <label for="approval-withdraw">取下</label>
                             </div>
                         </div>
-                        <div class="remarks-section">                          
-                            <textarea class="remarks-textarea" data-field="basic-info_comment" onpaste="handlePaste(event, 'basic-info_image')"></textarea>
-                            <div class="image-thumbnails" data-images="basic-info_image">
-                        </div>
+                    </div>
+                    <div class="remarks-section">                        
+                        <textarea class="remarks-textarea" data-field="applicant_q1_comment" onpaste="handlePaste(event, 'applicant_q1_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q1_image"></div>                        
                     </div>
                 </div>
             </div>
@@ -109,11 +109,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="remarks-section">
-                        
+                    <div class="remarks-section">                        
                         <textarea class="remarks-textarea" data-field="applicant_q1_comment" onpaste="handlePaste(event, 'applicant_q1_image')"></textarea>
-                        <div class="image-thumbnails" data-images="applicant_q1_image"></div>
-                        
+                        <div class="image-thumbnails" data-images="applicant_q1_image"></div>                        
                     </div>
                 </div>
 
@@ -130,25 +128,25 @@
                                 <label for="ongoing-app">途上申込</label>
                             </div>
                         </div>
-                        
-                        <div class="nested-question" id="changeContentQuestion" style="display: none;">
-                            <div style="font-size: 12px; margin-bottom: 6px;">変更内容が以下のいずれかである。（利用目的、取引金額、取引件数）</div>
-                            <div class="radio-group">
-                                <div class="radio-item">
-                                    <input type="radio" name="changeContent" value="はい" data-field="changeContent" id="change-yes" onchange="updateDynamicFields()">
-                                    <label for="change-yes">はい</label>
-                                </div>
-                                <div class="radio-item">
-                                    <input type="radio" name="changeContent" value="いいえ" data-field="changeContent" id="change-no" onchange="updateDynamicFields()">
-                                    <label for="change-no">いいえ</label>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                    <div class="remarks-section">
-                        
+                    <div class="remarks-section">                        
                         <textarea class="remarks-textarea" data-field="applicant_q2_comment" onpaste="handlePaste(event, 'applicant_q2_image')"></textarea>
                         <div class="image-thumbnails" data-images="applicant_q2_image"></div>
+                    </div>
+                </div>
+                <div class="question-row nested-question hidden" id="changeContentQuestion">
+                    <div class="question-title">変更内容が以下のいずれかである。<br>(利用目的/取引金額/取引件数)</div>
+                    <div class="question-input">
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="changeContent" value="はい" data-field="changeContent" id="change-yes" onchange="updateDynamicFields()">
+                                <label for="change-yes">はい</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="changeContent" value="いいえ" data-field="changeContent" id="change-no" onchange="updateDynamicFields()">
+                                <label for="change-no">いいえ</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -187,38 +185,37 @@
                                 <label for="not-crypto-no">いいえ</label>
                             </div>
                         </div>
-                        
-                        <div class="nested-question" id="cryptoQuestions" style="display: none;">
-                            <div style="font-size: 12px; margin-bottom: 6px;">USD・JPYは取り扱いができないことについて顧客了承を得た</div>
-                            <div class="radio-group" style="margin-bottom: 8px;">
-                                <div class="radio-item">
-                                    <input type="radio" name="cryptoUsdJpyConsent" value="はい" data-field="cryptoUsdJpyConsent" id="crypto-consent-yes">
-                                    <label for="crypto-consent-yes">はい</label>
-                                </div>
-                                <div class="radio-item">
-                                    <input type="radio" name="cryptoUsdJpyConsent" value="いいえ" data-field="cryptoUsdJpyConsent" id="crypto-consent-no">
-                                    <label for="crypto-consent-no">いいえ</label>
-                                </div>
-                            </div>
-                            
-                            <div style="font-size: 12px; margin-bottom: 6px;">【別紙2】外貨送金サービス_事前登録届出書を受領した</div>
-                            <div class="radio-group">
-                                <div class="radio-item">
-                                    <input type="radio" name="cryptoRegistrationReceived" value="はい" data-field="cryptoRegistrationReceived" id="crypto-reg-yes">
-                                    <label for="crypto-reg-yes">はい</label>
-                                </div>
-                                <div class="radio-item">
-                                    <input type="radio" name="cryptoRegistrationReceived" value="いいえ" data-field="cryptoRegistrationReceived" id="crypto-reg-no">
-                                    <label for="crypto-reg-no">いいえ</label>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     <div class="remarks-section">
+                        <textarea class="remarks-textarea" data-field="applicant_q3_comment" onpaste="handlePaste(event, 'applicant_q3_image')"></textarea>
+                        <div class="image-thumbnails" data-images="applicant_q3_image"></div>                        
+                    </div>
+                </div> 
                         
-                        <textarea class="remarks-textarea" data-field="applicant_q4_comment" onpaste="handlePaste(event, 'applicant_q4_image')"></textarea>
-                        <div class="image-thumbnails" data-images="applicant_q4_image"></div>
-                        
+                <div class="question-row nested-question hidden" id="cryptoQuestions" style="display: none;">
+                    <div style="font-size: 12px; margin-bottom: 6px;">USD・JPYは取り扱いができないことについて顧客了承を得た</div>
+                    <div class="radio-group" style="margin-bottom: 8px;">
+                        <div class="radio-item">
+                            <input type="radio" name="cryptoUsdJpyConsent" value="はい" data-field="cryptoUsdJpyConsent" id="crypto-consent-yes">
+                            <label for="crypto-consent-yes">はい</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="cryptoUsdJpyConsent" value="いいえ" data-field="cryptoUsdJpyConsent" id="crypto-consent-no">
+                            <label for="crypto-consent-no">いいえ</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="question-row nested-question hidden" id="cryptoQuestions" style="display: none;"></div>                    
+                    <div style="font-size: 12px; margin-bottom: 6px;">【別紙2】外貨送金サービス_事前登録届出書を受領した</div>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" name="cryptoRegistrationReceived" value="はい" data-field="cryptoRegistrationReceived" id="crypto-reg-yes">
+                            <label for="crypto-reg-yes">はい</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="cryptoRegistrationReceived" value="いいえ" data-field="cryptoRegistrationReceived" id="crypto-reg-no">
+                            <label for="crypto-reg-no">いいえ</label>
+                        </div>
                     </div>
                 </div>
 
