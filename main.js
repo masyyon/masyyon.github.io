@@ -319,11 +319,7 @@ function updateDynamicFields() {
     const isOngoing = formData.applicationType === '途上申込';
     const changeContentQuestion = document.getElementById('changeContentQuestion');
     if (changeContentQuestion) {
-        if (isOngoing) {
-            changeContentQuestion.classList.remove('hidden');
-        } else {
-            changeContentQuestion.classList.add('hidden');
-        }
+        changeContentQuestion.style.display = isOngoing ? 'block': 'none';
     }
 
     // 変更内容がいいえの場合の非活性化
@@ -385,7 +381,6 @@ function updateDynamicFields() {
 // 提出可能日の動的制御
 function updateSubmissionDateFields(sectionNum) {
     const managementSheetValue = formData[`managementSheetFilled_${sectionNum}`] === 'はい';
-
     const submissionDateInputDiv = document.getElementById(`submissionDateInput_${sectionNum}`);
     
     if (submissionDateInputDiv) {
@@ -407,6 +402,16 @@ function updateLocationFields(sectionNum) {
     
     if (middleEastQuestion) {
         middleEastQuestion.style.display = isMiddleEastNo ? 'block' : 'none';
+    }
+}
+
+// 申告の取引額・件数変更時の動的制御
+function updateChangeNotice(sectionNum) {
+    const declaredChangeNo = formData[`declaredAmountCountChange_${sectionNum}`] === 'いいえ';
+    const changeNotice = document.getElementById(`changeNotice_${sectionNum}`);
+    
+    if (changeNotice) {
+        changeNotice.style.display = declaredChangeNo ? 'block' : 'none';
     }
 }
 
@@ -640,11 +645,86 @@ function saveToJSON() {
 }
 
 function getBaseCSS() {
-  return fetch('css/base.css').then(response => response.text());
+  return `
+    :root {
+    --primary: #030213;
+    --primary-foreground: #fff;
+    --secondary: #f3f3f5;
+    --muted: #ececf0;
+    --muted-foreground: #717182;
+    --border: rgba(0,0,0,0.1);
+    --destructive: #d4183d;
+    --destructive-foreground* { box-sizing: border-box; margin: 0; padding: 0; }  --destructive-foreground: #fff;
+    body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.4; color: #030213; background: #fff; font-size: 14px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .header h1 { font-size: 20px; font-weight: 500; }
+    .button-group { display: flex; gap: 8px; }
+    .btn { padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: var(--radius); cursor: pointer; font-size: 13px; transition: background-color 0.2s; }
+    .btn:hover { background: var(--secondary); }
+    .section { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    .section-header { padding: 12px 16px; background: var(--secondary); border-bottom: 1px solid var(--border); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+    .section-content { padding: 12px; }
+    .question-row { display: grid; grid-template-columns: 2fr 3fr 300px; gap: 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .question-row:last-child { border-bottom: none; }
+    .question-row.disabled { opacity: 0.5; pointer-events: none; background: #f9f9f9; }
+    .question-title { font-size: 13px; line-height: 1.3; }
+    .question-input { display: flex; flex-direction: column; gap: 4px; }
+    .form-control { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; background: var(--secondary); }
+    .form-control:focus { outline: none; border-color: var(--primary); }
+    .radio-group { display: flex; gap: 12px; align-items: center; }
+    .radio-item { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+    .nested-question { margin-left: 20px; margin-top: 8px; padding: 8px 12px; background: var(--muted); border-radius: 4px; border-left: 3px solid var(--primary); }
+    .remarks-section { margin-top: 8px; }
+    .remarks-label { font-size: 12px; color: var(--muted-foreground); margin-bottom: 4px; display: block; }
+    .remarks-textarea { width: 100%; min-height: 40px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; resize: vertical; background: #fff; }
+    .image-thumbnails { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .image-thumbnail { position: relative; width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+    .image-remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: var(--destructive); color: #fff; border: none; border-radius: 50%; cursor: pointer; font-size: 10px; display: none; align-items: center; justify-content: center; }
+    .image-remove.disabled { opacity: 0.5; pointer-events: none; }
+    .image-thumbnail:hover .image-remove { display: flex; }
+    .image-hint { font-size: 11px; color: var(--muted-foreground); margin-top: 4px; }
+    .accordion { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+    .accordion-header { padding: 10px 16px; background: var(--secondary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .accordion-header:hover { background: var(--muted); }
+    .accordion-header.strong { font-weight: bold; color: #009fae; background: #e6faff; text-decoration: underline; }
+    .accordion-content { display: none; padding: 12px; }
+    .accordion.open .accordion-content { display: block; }
+    .accordion-toggle { transition: transform 0.2s; }
+    .accordion.open .accordion-toggle { transform: rotate(180deg); }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal.show { display: flex; }
+    .modal-content { max-width: 90vw; max-height: 90vh; background: #fff; border-radius: var(--radius); padding: 8px; }
+    .modal-image { max-width: 100%; max-height: 100%; border-radius: 4px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .hidden { display: none; }
+    .basic-info .question-row { grid-template-columns: 2fr 3fr; }
+    .input-group { display: flex; flex-direction: column; gap: 4px; }
+    .input-group label { font-size: 12px; color: var(--muted-foreground); }
+    input[type="radio"]:disabled:checked + label {
+    background: #bcd7fa; color: #205080; border-radius: 4px; font-weight: bold; opacity: 1; padding: 2px 8px;
+    }
+    .question-row.error .question-title {
+    color: var(--destructive); font-weight: 700; background: rgba(212,24,61,0.06); padding: 4px 6px; border-radius: 4px;
+    }
+    .field-error { border: 2px solid #d4183d; background: #fff0f0; }
+    .question-row.error .remarks-section .remarks-textarea,
+    .field-error[type="textarea"] { border: 1px solid var(--border); background: #fff; }
+    @media (max-width: 768px) {
+    .question-row, .basic-info .question-row, .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 8px; }
+    }
+    --radius: 6px;
+    }
+  `;
 }
 
 // 静的HTML保存
-async function saveToStaticHTML() {
+function saveToStaticHTML() {
     const clone = document.documentElement.cloneNode(true);
 
     // 不要な要素を削除
@@ -699,7 +779,7 @@ async function saveToStaticHTML() {
     const head = clone.querySelector('head');
     if (head) {
         const styleTag = document.createElement('style');
-        styleTag.textContent = await getBaseCSS();
+        styleTag.textContent = getBaseCSS();
         head.appendChild(styleTag);
     }
 
