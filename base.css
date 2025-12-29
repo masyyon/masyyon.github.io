@@ -155,7 +155,7 @@ body {
 }
 
 .nested-question .question-row {
-    padding: 2px 0;            
+    padding: 6px 6px;            
     gap: 12px;
 }
 
@@ -202,20 +202,22 @@ body {
 }
 
 .image-remove {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 16px;
-    height: 16px;
-    background: var(--destructive);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 10px;
-    display: none;
-    align-items: center;
-    justify-content: center;
+  position: absolute;
+  top: 4px;         
+  right: 4px;
+  width: 24px;      
+  height: 24px;
+  font-size: 10px;  
+  line-height: 1;
+  background: var(--destructive);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: none;    
+  align-items: center;
+  justify-content: center;
+  z-index: 2;       
 }
 
 .image-remove.disabled {
@@ -258,7 +260,11 @@ body {
   font-weight: bold;
   color: #009fae;         /* シアン */
   background: #e6faff;    /* 薄いシアン背景 */
-  text-decoration: underline;
+}
+
+.accordion-header.disabled {
+  opacity: 0.5;               /* グレーアウト */
+  cursor: not-allowed;        /* マウスカーソルを「不可」に */
 }
 
 .accordion-content {
@@ -297,17 +303,21 @@ body {
 }
 
 .modal-content {
-    max-width: 90vw;
-    max-height: 90vh;
-    background: white;
-    border-radius: var(--radius);
-    padding: 8px;
+  width: 90vw;
+  max-height: 90vh;       /* ここは上限だけにして、縦スクロール許可 */
+  background: white;
+  border-radius: var(--radius);
+  padding: 0;             /* 幅いっぱいにしたいので余白は0推奨（任意） */
+  overflow-y: auto;       /* 縦方向にスクロール可 */
+  display: block;         /* Flex不要ならblockのままでOK */
 }
 
 .modal-image {
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 4px;
+  display: block;
+  width: 100%;            /* 横幅フル */
+  height: auto;           /* 縦は比率維持で自動 */
+  object-fit: contain;    /* 任意（width:100%なので効きは限定的） */
+  image-rendering: auto;
 }
 
 /* グリッドレイアウト用 */
@@ -370,20 +380,4 @@ input[type="radio"]:disabled:checked + label {
 .field-error[type="textarea"] {
   border: 1px solid var(--border);
   background: white;
-}
-
-/* レスポンシブ */
-@media (max-width: 768px) {
-    .question-row {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-    
-    .basic-info .question-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .grid-2, .grid-3 {
-        grid-template-columns: 1fr;
-    }
 }
