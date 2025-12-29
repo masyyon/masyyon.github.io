@@ -1,24 +1,89 @@
 // グローバル変数
 let formData = {};
 let imageData = {};
+let eventsBound = false;
+
+// === 状態定義とUI制御ユーティリティ ===
+const STATUS = { INITIAL: 'initial', LOADED: 'loaded', EDITING: 'editing' };
+let appStatus = STATUS.INITIAL; // 初期表示（編集不可）
+let isReadOnly = false;
+
+function getButtons() {
+  return {
+    finalize: document.getElementById('finalize'),   // チェックシート確定（静的HTML）
+    tempSave: document.getElementById('tempSave'),   // 一時保存（JSON）
+    loadFile: document.getElementById('loadFile'),   // ファイル読込（可視ボタン）
+    loadInput: document.getElementById('loadInput'), // ファイル選択 input[type=file]
+    edit: document.getElementById('editButton'),     // 編集
+  };
+}
+
+function setButtonEnabled(el, enabled) {
+  if (!el) return;
+  el.disabled = !enabled;
+}
+
+function updateButtonsForStatus() {
+  const btn = getButtons();
+  // 表に基づく活性／非活性
+  switch (appStatus) {
+    case STATUS.INITIAL:
+      setButtonEnabled(btn.finalize, false);   // ×
+      setButtonEnabled(btn.tempSave, false);   // ×
+      setButtonEnabled(btn.loadFile, true);    // 〇
+      setButtonEnabled(btn.edit, true);        // 〇
+      break;
+    case STATUS.LOADED:
+      setButtonEnabled(btn.finalize, false);   // ×
+      setButtonEnabled(btn.tempSave, false);   // ×
+      setButtonEnabled(btn.loadFile, false);   // ×
+      setButtonEnabled(btn.edit, true);        // 〇
+      break;
+    case STATUS.EDITING:
+      setButtonEnabled(btn.finalize, true);    // 〇
+      setButtonEnabled(btn.tempSave, true);    // 〇
+      setButtonEnabled(btn.loadFile, false);   // ×
+      setButtonEnabled(btn.edit, false);       // ×
+      break;
+  }
+}
+
+// 状態を切り替え、isReadOnly・入力欄・ボタン状態を同期
+function setStatus(next) {
+  appStatus = next;
+  isReadOnly = (next !== STATUS.EDITING); // isReadOnly の同期
+  setAllFieldsDisabled(isReadOnly);       // 入力欄の活性／非活性
+  updateTransactionHeaderHighlight()      // 取引内容の強調／非活性
+  updateButtonsForStatus();               // ボタンの活性／非活性
+}
 
 // 初期化
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     updateLastUpdateDate();
-    generateTransactionSections();
-    bindEvents();
     updateDynamicFields();
+    updateRemitSourceFields();
+    updateTransactionScaleFields();
 
-    const saveButton = document.getElementById('saveButton');
-    if (saveButton) {
-        saveButton.addEventListener('click', saveToJSON);
-    }
+    // 初期状態：初期表示（編集不可）
+    setStatus(STATUS.INITIAL);
 
-    const staticHTMLButton = document.getElementById('staticHTMLButton');
-    if (staticHTMLButton) {
-        staticHTMLButton.addEventListener('click', saveToStaticHTML);
-        staticHTMLButton.addEventListener('click', saveToJSON);
-    }
+    // ボタンのイベントバインド（活性・非活性は setStatus が管理）
+    const btn = getButtons();
+    if (btn.tempSave)      btn.tempSave.addEventListener('click', saveToJSON);
+    if (btn.finalize)      btn.finalize.addEventListener('click', saveToStaticHTML);    
+    if (btn.loadFile){
+      btn.loadFile.addEventListener('click', () => {
+        if (btn.loadInput){
+          btn.loadInput.value = ''; //空にする
+          btn.loadInput.click();
+        }
+      })
+    };
+    if (btn.loadInput)     btn.loadInput.addEventListener('change', loadFromJSON);
+    if (btn.edit)          btn.edit.addEventListener('click', enableEditMode);
+
+    // 入力イベント委譲
+    bindEvents();
 });
 
 // 最終更新日時を更新
@@ -30,258 +95,24 @@ function updateLastUpdateDate() {
     if (field) field.value = formatted;
 }
 
-// 取引内容セクション2-5の内容を生成
-function generateTransactionSections() {
-    for (let i = 2; i <= 5; i++) {
-        const content = document.querySelector(`[data-section="${i}"] .accordion-content`);
-        if (content) {
-            content.innerHTML = generateTransactionContent(i);
-        }
+function applyFormDataToDOM() {
+  document.querySelectorAll('[data-field]').forEach(el => {
+    const key = el.dataset.field;
+    if (!(key in formData)) return;
+
+    if (el.type === 'radio') {
+      el.checked = (el.value === formData[key]);
+    } else if (el.tagName.toLowerCase() === 'select') {
+      el.value = formData[key];
+    } else {
+      el.value = formData[key];
     }
-}
 
-// 取引内容の質問を生成
-function generateTransactionContent(sectionNum) {
-    return `
-        <div class="question-row">
-            <div class="question-title">1. 外貨送金か外貨受取か</div>
-            <div class="question-input">
-                <div class="radio-group">
-                    <div class="radio-item">
-                        <input type="radio" name="transactionType_${sectionNum}" value="外貨送金" data-field="transactionType_${sectionNum}" id="type-send-${sectionNum}" onchange="updateRemitSourceFields(${sectionNum})">
-                        <label for="type-send-${sectionNum}">外貨送金</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="transactionType_${sectionNum}" value="外貨受取" data-field="transactionType_${sectionNum}" id="type-receive-${sectionNum}" onchange="updateRemitSourceFields(${sectionNum})">
-                        <label for="type-receive-${sectionNum}">外貨受取</label>
-                    </div>
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q1_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q1_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q1_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-
-        <div class="question-row" data-dynamic="transaction_q2_${sectionNum}">
-            <div class="question-title">2. 前払い等で輸入許可通知書が確認できない場合は、管理シートに記入した</div>
-            <div class="question-input">
-                <div class="radio-group">
-                    <div class="radio-item">
-                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="はい" data-field="managementSheetFilled_${sectionNum}" id="mgmt-yes-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
-                        <label for="mgmt-yes-${sectionNum}">はい</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="いいえ" data-field="managementSheetFilled_${sectionNum}" id="mgmt-no-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
-                        <label for="mgmt-no-${sectionNum}">いいえ</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="managementSheetFilled_${sectionNum}" value="前払いでないため不要" data-field="managementSheetFilled_${sectionNum}" id="mgmt-unnecessary-${sectionNum}" onchange="updateSubmissionDateFields(${sectionNum})">
-                        <label for="mgmt-unnecessary-${sectionNum}">前払いでないため不要</label>
-                    </div>
-                </div>
-                <div id="submissionDateInput_${sectionNum}" class="input-group" style="display: none; margin-top: 8px;">
-                    <label>提出可能日</label>
-                    <input type="date" class="form-control" data-field="submissionDate_${sectionNum}">
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q2_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q2_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q2_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-
-        <div class="question-row" data-dynamic="transaction_q3_${sectionNum}">
-            <div class="question-title">3. 取引目的が申込企業の謄本記載の事業内容と関連性がある。</div>
-            <div class="question-input">
-                <div class="radio-group">
-                    <div class="radio-item">
-                        <input type="radio" name="transactionPurposeRelated_${sectionNum}" value="はい" data-field="transactionPurposeRelated_${sectionNum}" id="purpose-yes-${sectionNum}">
-                        <label for="purpose-yes-${sectionNum}">はい</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="transactionPurposeRelated_${sectionNum}" value="いいえ" data-field="transactionPurposeRelated_${sectionNum}" id="purpose-no-${sectionNum}">
-                        <label for="purpose-no-${sectionNum}">いいえ</label>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label>取引目的・品目</label>
-                    <input type="text" class="form-control" data-field="transactionPurposeItems_${sectionNum}" placeholder="取引目的・品目">
-                </div>                           
-                <div class="nested-question">
-                    <div style="font-size: 12px; margin-bottom: 6px;">取引内容が以下にあたらない（火薬品、仮想通貨、大麻、アダルトグッズ、ギャンブル性の高い商品（オンラインカジノ等））</div>
-                    <div class="radio-group" style="margin-bottom: 8px;">
-                        <div class="radio-item">
-                            <input type="radio" name="transactionContentSafe_${sectionNum}" value="はい" data-field="transactionContentSafe_${sectionNum}" id="content-safe-yes-${sectionNum}">
-                            <label for="content-safe-yes-${sectionNum}">はい</label>
-                        </div>
-                        <div class="radio-item">
-                            <input type="radio" name="transactionContentSafe_${sectionNum}" value="いいえ" data-field="transactionContentSafe_${sectionNum}" id="content-safe-no-${sectionNum}">
-                            <label for="content-safe-no-${sectionNum}">いいえ</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q3_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q3_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q3_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-
-        <div class="question-row">
-            <div class="question-title">4. 取引先企業/関連企業/銀行/積載地/仕向地の所在国・地域が以下A、B、Cに該当しないことを確認する。</div>
-            <div class="question-input">
-                <div class="grid-2">
-                    <div class="input-group">
-                        <label>取引先企業</label>
-                        <input type="text" class="form-control" data-field="partnerCompany_${sectionNum}" placeholder="取引先企業">
-                    </div>
-                    <div class="input-group">
-                        <label>関連企業</label>
-                        <input type="text" class="form-control" data-field="relatedCompany_${sectionNum}" placeholder="関連企業">
-                    </div>
-                    <div class="input-group">
-                        <label>銀行</label>
-                        <input type="text" class="form-control" data-field="bank_${sectionNum}" placeholder="銀行">
-                    </div>
-                    <div class="input-group">
-                        <label>積載地</label>
-                        <input type="text" class="form-control" data-field="loadingLocation_${sectionNum}" placeholder="積載地">
-                    </div>
-                    <div class="input-group">
-                        <label>仕向地</label>
-                        <input type="text" class="form-control" data-field="destination_${sectionNum}" placeholder="仕向地">
-                    </div>
-                </div>
-                
-                <div class="nested-question">
-                    <div style="font-size: 12px; margin-bottom: 6px;">A. 以下に該当しない。※具体的な国名は参考資料シートを参照<br>・北朝鮮・イラン・ロシア・ベラルーシ<br>・外為法第16条第１項～３項に基づく許可の対象となる国、高リスク国（南アフリカ、フィリピン、ベトナム除く）、タックスヘイブン</div>
-                    <div class="radio-group" style="margin-bottom: 8px;">
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckA_${sectionNum}" value="はい" data-field="locationCheckA_${sectionNum}" id="loc-a-yes-${sectionNum}">
-                            <label for="loc-a-yes-${sectionNum}">はい</label>
-                        </div>
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckA_${sectionNum}" value="いいえ" data-field="locationCheckA_${sectionNum}" id="loc-a-no-${sectionNum}">
-                            <label for="loc-a-no-${sectionNum}">いいえ</label>
-                        </div>
-                    </div>
-                    
-                    <div style="font-size: 12px; margin-bottom: 6px;">B. 中国三省（遼寧省、吉林省、黒竜江省）に該当しない。</div>
-                    <div class="radio-group" style="margin-bottom: 8px;">
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckB_${sectionNum}" value="はい" data-field="locationCheckB_${sectionNum}" id="loc-b-yes-${sectionNum}" onchange="updateLocationFields(${sectionNum})">
-                            <label for="loc-b-yes-${sectionNum}">はい</label>
-                        </div>
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckB_${sectionNum}" value="いいえ" data-field="locationCheckB_${sectionNum}" id="loc-b-no-${sectionNum}" onchange="updateLocationFields(${sectionNum})">
-                            <label for="loc-b-no-${sectionNum}">いいえ</label>
-                        </div>
-                    </div>
-                    
-                    <div id="chinaQuestion_${sectionNum}" style="display: none; margin-left: 16px; margin-bottom: 8px;">
-                        <div style="font-size: 12px; margin-bottom: 6px;">取引品目が北朝鮮特産品にあたらない（海産物、サルトリイバラの葉など）</div>
-                        <div class="radio-group">
-                            <div class="radio-item">
-                                <input type="radio" name="notNKSpecialty_${sectionNum}" value="はい" data-field="notNKSpecialty_${sectionNum}" id="nk-specialty-yes-${sectionNum}">
-                                <label for="nk-specialty-yes-${sectionNum}">はい</label>
-                            </div>
-                            <div class="radio-item">
-                                <input type="radio" name="notNKSpecialty_${sectionNum}" value="いいえ" data-field="notNKSpecialty_${sectionNum}" id="nk-specialty-no-${sectionNum}">
-                                <label for="nk-specialty-no-${sectionNum}">いいえ</label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="font-size: 12px; margin-bottom: 6px;">C. 中東地域に該当しない。（アフガニスタン、アラブ首長国連邦、イエメン、イスラエル、イラク、イラン、オマーン、カタール、クウェート、サウジアラビア、シリア、トルコ、バーレーン、ヨルダン、レバノン）</div>
-                    <div class="radio-group" style="margin-bottom: 8px;">
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckC_${sectionNum}" value="はい" data-field="locationCheckC_${sectionNum}" id="loc-c-yes-${sectionNum}" onchange="updateLocationFields(${sectionNum})">
-                            <label for="loc-c-yes-${sectionNum}">はい</label>
-                        </div>
-                        <div class="radio-item">
-                            <input type="radio" name="locationCheckC_${sectionNum}" value="いいえ" data-field="locationCheckC_${sectionNum}" id="loc-c-no-${sectionNum}" onchange="updateLocationFields(${sectionNum})">
-                            <label for="loc-c-no-${sectionNum}">いいえ</label>
-                        </div>
-                    </div>
-                    
-                    <div id="middleEastQuestion_${sectionNum}" style="display: none; margin-left: 16px;">
-                        <div style="font-size: 12px; margin-bottom: 6px;">取引品目が「中古車」ではない</div>
-                        <div class="radio-group">
-                            <div class="radio-item">
-                                <input type="radio" name="notUsedCar_${sectionNum}" value="はい" data-field="notUsedCar_${sectionNum}" id="used-car-yes-${sectionNum}">
-                                <label for="used-car-yes-${sectionNum}">はい</label>
-                            </div>
-                            <div class="radio-item">
-                                <input type="radio" name="notUsedCar_${sectionNum}" value="いいえ" data-field="notUsedCar_${sectionNum}" id="used-car-no-${sectionNum}">
-                                <label for="used-car-no-${sectionNum}">いいえ</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q4_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q4_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q4_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-
-        <div class="question-row" data-dynamic="transaction_q5_${sectionNum}">
-            <div class="question-title">5. 取引先が取引不能業者にあたらない（公序良俗に反する商品・サービスの提供、ギャンブル・懸賞サイト、結婚紹介・出会い系サイト、ネットワークビジネス、送金代行・収納代行）</div>
-            <div class="question-input">
-                <div class="radio-group">
-                    <div class="radio-item">
-                        <input type="radio" name="partnerNotProhibited_${sectionNum}" value="はい" data-field="partnerNotProhibited_${sectionNum}" id="partner-ok-yes-${sectionNum}">
-                        <label for="partner-ok-yes-${sectionNum}">はい</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="partnerNotProhibited_${sectionNum}" value="いいえ" data-field="partnerNotProhibited_${sectionNum}" id="partner-ok-no-${sectionNum}">
-                        <label for="partner-ok-no-${sectionNum}">いいえ</label>
-                    </div>
-                </div>
-                <div class="input-group" style="margin-top: 8px;">
-                    <label>取引先事業内容</label>
-                    <input type="text" class="form-control" data-field="partnerBusinessContent_${sectionNum}" placeholder="取引先事業内容">
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q5_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q5_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q5_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-
-        <div class="question-row" data-dynamic="transaction_q6_${sectionNum}">
-            <div class="question-title">6. ネット検索で、送金先または送金元の企業（個人）の風評に問題がない<br>検索ワード：法人名＋朝鮮、法人名＋迂回、法人名＋詐欺、法人名＋裁判</div>
-            <div class="question-input">
-                <div class="radio-group">
-                    <div class="radio-item">
-                        <input type="radio" name="noPartnerReputationRisk_${sectionNum}" value="はい" data-field="noPartnerReputationRisk_${sectionNum}" id="partner-rep-yes-${sectionNum}">
-                        <label for="partner-rep-yes-${sectionNum}">はい</label>
-                    </div>
-                    <div class="radio-item">
-                        <input type="radio" name="noPartnerReputationRisk_${sectionNum}" value="いいえ" data-field="noPartnerReputationRisk_${sectionNum}" id="partner-rep-no-${sectionNum}">
-                        <label for="partner-rep-no-${sectionNum}">いいえ</label>
-                    </div>
-                </div>
-            </div>
-            <div class="remarks-section">
-                
-                <textarea class="remarks-textarea" data-field="transaction_q6_${sectionNum}_comment" onpaste="handlePaste(event, 'transaction_q6_${sectionNum}_image')"></textarea>
-                <div class="image-thumbnails" data-images="transaction_q6_${sectionNum}_image"></div>
-                
-            </div>
-        </div>
-    `;
+    // 疎明資料金額（万円）はカンマ付与（evidenceAmount_${index} に対応）
+    if (key.startsWith('evidenceAmount')) {
+      formatEvidenceAmount(el);
+    }
+  });
 }
 
 // 疎明資料金額（万円）をカンマ区切りにする
@@ -299,18 +130,50 @@ function formatEvidenceAmount(element) {
 }
 
 // イベントバインド
+
 function bindEvents() {
-    document.querySelectorAll('[data-field]').forEach(element => {
-        const handler = function() {
-            formData[this.dataset.field] = this.value;
-            updateLastUpdateDate();
-            if (this.dataset.field === 'evidenceAmount') {
-                formatEvidenceAmount(this);
-            }
-        };
-        element.addEventListener('input', handler);
-        element.addEventListener('change', handler);
-    });
+  if (eventsBound) return;
+  eventsBound = true;
+
+  document.addEventListener('input', function (e) {
+    const el = e.target;
+    const field = el?.dataset?.field;
+    if (!field) return;
+
+    formData[field] = el.value;
+    updateLastUpdateDate();
+
+    // 疎明資料金額（万円）のフォーマット
+    if (field.startsWith('evidenceAmount')) {
+      formatEvidenceAmount(el);
+    }
+  });
+
+  document.addEventListener('change', function (e) {
+    const el = e.target;
+    const field = el?.dataset?.field;
+    if (!field) return;
+
+    formData[field] = el.value;
+    updateLastUpdateDate();
+
+    // 取引件数変更 → 再生成
+    if (field === 'transactionCount') {
+      updateTransactionHeaderHighlight();
+      return;
+    }
+
+    // 末尾 _N からセクション番号を推定
+    const m = field.match(/_(\d+)$/);
+    if (m) {
+      const idx = Number(m[1]);
+      if (field.startsWith('managementSheetFilled_')) updateSubmissionDateFields(idx);
+      if (field.startsWith('locationCheckB_') || field.startsWith('locationCheckC_')) updateLocationFields(idx);
+      if (field.startsWith('declaredAmountCountChange_')) updateChangeNotice(idx);
+    }
+    updateRemitSourceFields();
+    if (field === 'transactionScale') updateTransactionScaleFields();
+  });
 }
 
 // 動的フィールド更新
@@ -447,79 +310,218 @@ function updateTransactionScaleFields() {
 
 // 送金原資の動的制御
 function updateRemitSourceFields() {
-    let hasRemit = false;
-    for (let i = 1; i <= 5; i++) {
-        if (formData[`transactionType_${i}`] === '外貨送金') {
-        hasRemit = true;
-        break;
-        }
+  const count = Number(formData.transactionCount ?? 1);
+  let hasRemit = false;
+  for (let i = 1; i <= count; i++) {
+    if (formData[`transactionType_${i}`] === '外貨送金') {
+      hasRemit = true;
+      break;
     }
-    const remittanceSourceDiv = document.getElementById('remittanceSourceQuestion');
-    if (remittanceSourceDiv) {
-        if(hasRemit){
-            remittanceSourceDiv.classList.remove('disabled');
-        }
-        else{
-            remittanceSourceDiv.classList.add('disabled');
-        }
-    }
+  }
+  const remittanceSourceDiv = document.getElementById('remittanceSourceQuestion');
+  if (remittanceSourceDiv) {
+    if (hasRemit) remittanceSourceDiv.classList.remove('disabled');
+    else remittanceSourceDiv.classList.add('disabled');
+  }
 }
 
-// アコーディオン
-function toggleAccordion(header) {
-    const accordion = header.parentElement;
-    accordion.classList.toggle('open');
+// セクション生成時の初期化(活性/非活性)を集約
+function initSection(index) {
+  updateSubmissionDateFields(index);
+  updateLocationFields(index);
+  updateChangeNotice(index);  
+  updateTransactionScaleFields();
+  updateRemitSourceFields();
 }
 
-// 取引内容に数だけアコーディオン強調
-function updateTransactionHeaderHighlight() {
-  const count = formData[`transactionCount`] || 1;
-  document.querySelectorAll('#transactionSections .accordion-header').forEach((header, idx) => {
-    if (idx < count) {
-      header.classList.add('strong');
-    } else {
-      header.classList.remove('strong');
+// 任意のルート要素配下の「すべての属性値」に含まれる ${index} を実値に置換
+function replaceAllIndexPlaceholders(root, index) {
+  root.querySelectorAll('*').forEach(el => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.value && attr.value.includes('${index}')) {
+        attr.value = attr.value.replace(/\$\{index\}/g, index);
+      }
     }
   });
 }
 
-// 画像処理
+function buildTransactionContent(index) {
+  const tpl = document.getElementById('transaction-template');
+  if (!tpl) {
+    console.warn('transaction-template が見つかりません');
+    return null;
+  }
+  const frag = tpl.content.cloneNode(true);
+
+  // ${index} を実インデックスに置換
+  frag.querySelectorAll('[id],[name],[data-field],label[for],[data-section]').forEach(el => {
+    if (el.id)           el.id           = el.id.replace(/\$\{index\}/g, index);
+    if (el.name)         el.name         = el.name.replace(/\$\{index\}/g, index);
+    if (el.dataset && el.dataset.field) {
+      el.dataset.field = el.dataset.field.replace(/\$\{index\}/g, index);
+    }
+    if (el.tagName === 'LABEL' && el.htmlFor) {
+      el.htmlFor = el.htmlFor.replace(/\$\{index\}/g, index);
+    }
+    // テンプレート内の data-section を持つ場合も置換しておく（保険）
+    if (el.dataset && el.dataset.section) {
+      el.dataset.section = el.dataset.section.replace(/\$\{index\}/g, index);
+    }
+  });
+
+  // 全属性値の一括置換（data-images / onpaste / data-paste-key などを包括）
+  replaceAllIndexPlaceholders(frag, index);
+
+  // テンプレート内の .accordion-content を取り出す
+  const templateContent = frag.querySelector('.accordion-content');
+  if (!templateContent) {
+    console.warn('テンプレート内に .accordion-content が見つかりません');
+    return null;
+  }
+
+  // content の中身（子要素群）を DocumentFragment で返す
+  const contentFragment = document.createDocumentFragment();
+  Array.from(templateContent.childNodes).forEach(node => {
+    contentFragment.appendChild(node);
+  });
+  return contentFragment;
+}
+
+// アコーディオン・生成
+function toggleAccordion(header) {
+  // 非活性の場合は処理しない
+  if (header.classList.contains('disabled')) return;
+
+  const accordion = header.parentElement;
+  const index = Number(header.dataset.index ?? accordion.dataset.section);
+
+  if (accordion.classList.contains('open')) {
+    accordion.classList.remove('open');   // 閉じる（open クラスを削除）
+  }
+  else {
+    ensureSectionContentGenerated(index); // 1) 中身生成（既に生成済みなら何もしない）
+    accordion.classList.add('open');      // 2) 開く（open クラスを付与）
+  }
+}
+
+// 取引内容のアコーディオン制御
+function updateTransactionHeaderHighlight() {
+  const count = Number(formData.transactionCount ?? 1);
+  document.querySelectorAll('#transactionSections .accordion-header').forEach((header, idx) => {
+    header.classList.toggle('strong', idx < count);         // 強調：必要件数だけ見た目をハイライト
+    header.classList.toggle('disabled', (idx + 1) > count); // 無効：transactionCount超は非活性化
+    if ((idx + 1) > count) {
+      header.title = '取引内容の数を確認ください';
+      // 既に開いていたら閉じる（UI整合性のため）
+      const acc = header.parentElement;
+      if (acc?.classList.contains('open')) acc.classList.remove('open');
+    } else {
+      header.removeAttribute('title');
+    }
+  });
+}
+
+// === スクリーンショット縮小設定（固定） ===
+const SCREENSHOT_MIME = 'image/png'; // ロスレスで文字のにじみを抑える
+
+function blobToImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+function ensureCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  return c;
+}
+
+// 1/2縮小（にじみ抑制のための段階縮小を継続）
+function halfDown(canvasOrImg) {
+  const srcW = canvasOrImg.width, srcH = canvasOrImg.height;
+  const dstW = Math.max(1, Math.floor(srcW / 2));
+  const dstH = Math.max(1, Math.floor(srcH / 2));
+  const tmp = document.createElement('canvas');
+  tmp.width = dstW; tmp.height = dstH;
+  const ctx = tmp.getContext('2d');
+  ctx.imageSmoothingEnabled = true;     // true: 滑らか重視
+  ctx.imageSmoothingQuality = 'medium'; // high, medium, low
+  ctx.drawImage(canvasOrImg, 0, 0, dstW, dstH);
+  return tmp;
+}
+
+// 単一しきい値：width が NO_SHRINK_THRESHOLD を超える限り 1/2
+const NO_SHRINK_THRESHOLD = 1280;
+
+async function compressScreenshotBlob(blob) {
+  const img = await blobToImage(blob);
+  let canvas = ensureCanvas(img);
+
+  // 最大辺がしきい値より大きければ 1/2 を繰り返す
+  while (canvas.width > NO_SHRINK_THRESHOLD) {
+    canvas = halfDown(canvas);
+  }
+
+  return canvas.toDataURL(SCREENSHOT_MIME);
+}
+
 function handlePaste(event, fieldName) {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    
-    let hasImage = false;
-    for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.startsWith('image/')) {
-            hasImage = true;
-            const file = item.getAsFile();
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const base64Data = e.target.result;
-                    if (!imageData[fieldName]) {
-                        imageData[fieldName] = [];
-                    }
-                    imageData[fieldName].push(base64Data);
-                    displayImages(fieldName);
-                };
-                reader.readAsDataURL(file);
-            }
-        }
+  const items = event.clipboardData?.items;
+  if (!items) return;
+  let hasImage = false;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type.startsWith('image/')) {
+      hasImage = true;
+      const file = item.getAsFile();
+      if (file) {
+        compressScreenshotBlob(file)
+          .then((dataUrl) => {
+            if (!imageData[fieldName]) imageData[fieldName] = [];
+            imageData[fieldName].push(dataUrl);
+            displayImages(fieldName);
+          })
+          .catch((err) => console.error('[handlePaste] compress error:', err));
+      }
     }
-    
-    if (hasImage) {
-        event.preventDefault();
+  }
+  if (hasImage) event.preventDefault();
+}
+
+function ensureSectionContentGenerated(index) {
+  const accordion = document.querySelector(`.accordion[data-section="${index}"]`);
+  if (!accordion) return;
+  const content = accordion.querySelector('.accordion-content');
+  if (content.dataset.generated) return;
+
+  const fragment = buildTransactionContent(index);
+  if (fragment) {
+    content.innerHTML = '';
+    content.appendChild(fragment);
+    content.dataset.generated = 'true';
+
+    initSection(index)// 生成直後に初期化(toggleAccordion と同等)
+    applyFormDataToDOM(); // JSONの値をDOMへ反映
+
+    if (isReadOnly) {
+      setAllFieldsDisabled(true);// 閲覧専用中なら、非活性化を再適用
     }
+  }
 }
 
 function displayImages(fieldName) {
     const container = document.querySelector(`[data-images="${fieldName}"]`);
-    if (!container) return;
-
+    if(!container){
+      console.warn('[displayImages] コンテナ未生成:', fieldName); return;
+    }
     container.innerHTML = ''; // ← ここで常に表示をクリア
-
     if (!imageData[fieldName]) return;
 
     imageData[fieldName].forEach((imageSrc, index) => {
@@ -609,8 +611,24 @@ function validateRequiredFields() {
   return isValid;
 }
 
+// 保存時に取引内容セクションを自動オープン
+function openTransactionSectionsForSave() {
+  const count = Number(formData.transactionCount ?? 1);
+  document.querySelectorAll('#transactionSections .accordion-header')
+    .forEach(header => {
+      const acc = header.parentElement;
+      const sec = Number(acc.dataset.section);
+      if (sec <= count && !acc.classList.contains('open') && !header.classList.contains('disabled')) {
+        toggleAccordion(header);  // 生成→open付与（必ず開く）
+      }
+    });
+}
+
 // JSON保存・読み込み
 function saveToJSON() {
+    // 取引内容セクションの自動オープン
+    openTransactionSectionsForSave()
+
     // バリデーション実行（関数が存在する場合）
     let isValid = true;
     if (typeof validateRequiredFields === "function") {
@@ -646,89 +664,480 @@ function saveToJSON() {
 
 function getBaseCSS() {
   return `
+    @charset "UTF-8";
     :root {
-    --primary: #030213;
-    --primary-foreground: #fff;
-    --secondary: #f3f3f5;
-    --muted: #ececf0;
-    --muted-foreground: #717182;
-    --border: rgba(0,0,0,0.1);
-    --destructive: #d4183d;
-    --destructive-foreground* { box-sizing: border-box; margin: 0; padding: 0; }  --destructive-foreground: #fff;
+        --primary: #030213;
+        --primary-foreground: #ffffff;
+        --secondary: #f3f3f5;
+        --muted: #ececf0;
+        --muted-foreground: #717182;
+        --border: rgba(0, 0, 0, 0.1);
+        --destructive: #d4183d;
+        --destructive-foreground: #ffffff;
+        --radius: 6px;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
     body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.4; color: #030213; background: #fff; font-size: 14px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.4;
+        color: #030213;
+        background: #ffffff;
+        font-size: 13px;
     }
-    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-    .header h1 { font-size: 20px; font-weight: 500; }
-    .button-group { display: flex; gap: 8px; }
-    .btn { padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: var(--radius); cursor: pointer; font-size: 13px; transition: background-color 0.2s; }
-    .btn:hover { background: var(--secondary); }
-    .section { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
-    .section-header { padding: 12px 16px; background: var(--secondary); border-bottom: 1px solid var(--border); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
-    .section-content { padding: 12px; }
-    .question-row { display: grid; grid-template-columns: 2fr 3fr 300px; gap: 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-    .question-row:last-child { border-bottom: none; }
-    .question-row.disabled { opacity: 0.5; pointer-events: none; background: #f9f9f9; }
-    .question-title { font-size: 13px; line-height: 1.3; }
-    .question-input { display: flex; flex-direction: column; gap: 4px; }
-    .form-control { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; background: var(--secondary); }
-    .form-control:focus { outline: none; border-color: var(--primary); }
-    .radio-group { display: flex; gap: 12px; align-items: center; }
-    .radio-item { display: flex; align-items: center; gap: 4px; font-size: 13px; }
-    .nested-question { margin-left: 20px; margin-top: 8px; padding: 8px 12px; background: var(--muted); border-radius: 4px; border-left: 3px solid var(--primary); }
-    .remarks-section { margin-top: 8px; }
-    .remarks-label { font-size: 12px; color: var(--muted-foreground); margin-bottom: 4px; display: block; }
-    .remarks-textarea { width: 100%; min-height: 40px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; resize: vertical; background: #fff; }
-    .image-thumbnails { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .image-thumbnail { position: relative; width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-    .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
-    .image-remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: var(--destructive); color: #fff; border: none; border-radius: 50%; cursor: pointer; font-size: 10px; display: none; align-items: center; justify-content: center; }
-    .image-remove.disabled { opacity: 0.5; pointer-events: none; }
-    .image-thumbnail:hover .image-remove { display: flex; }
-    .image-hint { font-size: 11px; color: var(--muted-foreground); margin-top: 4px; }
-    .accordion { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
-    .accordion-header { padding: 10px 16px; background: var(--secondary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-    .accordion-header:hover { background: var(--muted); }
-    .accordion-header.strong { font-weight: bold; color: #009fae; background: #e6faff; text-decoration: underline; }
-    .accordion-content { display: none; padding: 12px; }
-    .accordion.open .accordion-content { display: block; }
-    .accordion-toggle { transition: transform 0.2s; }
-    .accordion.open .accordion-toggle { transform: rotate(180deg); }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; }
-    .modal.show { display: flex; }
-    .modal-content { max-width: 90vw; max-height: 90vh; background: #fff; border-radius: var(--radius); padding: 8px; }
-    .modal-image { max-width: 100%; max-height: 100%; border-radius: 4px; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .hidden { display: none; }
-    .basic-info .question-row { grid-template-columns: 2fr 3fr; }
-    .input-group { display: flex; flex-direction: column; gap: 4px; }
-    .input-group label { font-size: 12px; color: var(--muted-foreground); }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 16px;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .header h1 {
+        font-size: 20px;
+        font-weight: 500;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn {
+        padding: 6px 12px;
+        border: 1px solid var(--border);
+        background: white;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 13px;
+        transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+        background: var(--secondary);
+    }
+
+    #editButton {
+      display: inline-block;
+    }
+
+    .section {
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: white;
+    }
+
+    .section-header {
+        padding: 12px 16px;
+        background: var(--secondary);
+        border-bottom: 1px solid var(--border);
+        font-weight: 500;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .section-content {
+        padding: 12px;
+    }
+
+    .question-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 300px;
+        gap: 12px;
+        align-items: start;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .question-row:last-child {
+        border-bottom: none;
+    }
+
+    .question-row.disabled {
+        opacity: 1.0;
+        pointer-events: none;
+        background: #d6d6d6;
+    }
+
+    .question-title {
+        font-size: 13px;
+        line-height: 1.3;
+    }
+
+    .question-input {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .form-control {
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 13px;
+        background: var(--secondary);
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .radio-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .radio-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+    }
+
+    .nested-question {
+        margin-left: 12px;         
+        margin-top: 4px;           
+        padding: 6px 6px;            
+        background: var(--muted);
+        border-radius: 4px;
+        border-left: 3px solid var(--primary);
+    }
+
+    .nested-question .question-row {
+        padding: 6px 6px;            
+        gap: 12px;
+    }
+
+    .nested-question .question-title {
+        font-size: 12px;
+    }
+
+    .remarks-section {
+        margin-top: 0px;
+    }
+
+    .remarks-textarea {
+        width: 100%;
+        min-height: 30px;
+        padding: 4px 4px;
+        border: 1px solid var(--primary);
+        border-radius: 4px;
+        font-size: 12px;
+        resize: vertical;
+        background: white;
+    }
+
+    .image-thumbnails {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+    }
+
+    .image-thumbnail {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .image-thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        cursor: pointer;
+    }
+
+    .image-remove {
+      position: absolute;
+      top: 4px;         
+      right: 4px;
+      width: 24px;      
+      height: 24px;
+      font-size: 10px;  
+      line-height: 1;
+      background: var(--destructive);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: none;    
+      align-items: center;
+      justify-content: center;
+      z-index: 2;       
+    }
+
+    .image-remove.disabled {
+      opacity: 1.0;
+      pointer-events: none;
+    }
+
+    .image-thumbnail:hover .image-remove {
+        display: flex;
+    }
+
+    .image-hint {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        margin-top: 4px;
+    }
+
+    /* アコーディオン */
+    .accordion {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+    }
+
+    .accordion-header {
+        padding: 10px 16px;
+        background: var(--secondary);
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .accordion-header:hover {
+        background: var(--muted);
+    }
+
+    .accordion-header.strong {
+      font-weight: bold;
+      color: #009fae;         /* シアン */
+      background: #e6faff;    /* 薄いシアン背景 */
+    }
+
+    .accordion-header.disabled {
+      opacity: 0.5;               /* グレーアウト */
+      cursor: not-allowed;        /* マウスカーソルを「不可」に */
+    }
+
+    .accordion-content {
+        display: none;
+        padding: 12px;
+    }
+
+    .accordion.open .accordion-content {
+        display: block;
+    }
+
+    .accordion-toggle {
+        transition: transform 0.2s;
+    }
+
+    .accordion.open .accordion-toggle {
+        transform: rotate(180deg);
+    }
+
+    /* モーダル */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+      width: 90vw;
+      max-height: 90vh;       /* ここは上限だけにして、縦スクロール許可 */
+      background: white;
+      border-radius: var(--radius);
+      padding: 0;             /* 幅いっぱいにしたいので余白は0推奨（任意） */
+      overflow-y: auto;       /* 縦方向にスクロール可 */
+      display: block;         /* Flex不要ならblockのままでOK */
+    }
+
+    .modal-image {
+      display: block;
+      width: 100%;            /* 横幅フル */
+      height: auto;           /* 縦は比率維持で自動 */
+      object-fit: contain;    /* 任意（width:100%なので効きは限定的） */
+      image-rendering: auto;
+    }
+
+    /* グリッドレイアウト用 */
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    /* 縦配置のinput群 */
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .input-group label {
+        font-size: 12px;
+        color: var(--muted-foreground);
+    }
+
+    /* 非活性化されている選択済みラジオボタンをくすんだ青色で表示 */
     input[type="radio"]:disabled:checked + label {
-    background: #bcd7fa; color: #205080; border-radius: 4px; font-weight: bold; opacity: 1; padding: 2px 8px;
+      background: #bcd7fa;      /* くすんだ青色 */
+      color: #205080;           /* 文字もやや青系で */
+      border-radius: 4px;
+      font-weight: bold;
+      opacity: 1;
+      /* 必要に応じてpadding追加 */
+      padding: 2px 8px;
     }
+
+    /* エラー表示：行単位（question-row）に .error が付いている場合はタイトルを強調 */
     .question-row.error .question-title {
-    color: var(--destructive); font-weight: 700; background: rgba(212,24,61,0.06); padding: 4px 6px; border-radius: 4px;
+      color: var(--destructive);
+      font-weight: 700;
+      background: rgba(212,24,61,0.06);
+      padding: 4px 6px;
+      border-radius: 4px;
     }
-    .field-error { border: 2px solid #d4183d; background: #fff0f0; }
+
+    /* 個別要素に付くエラー（まれなケース） */
+    .field-error {
+      border: 2px solid #d4183d;
+      background: #fff0f0;
+    }
+
+    /* 備考欄はエラー時でも元の見た目を維持 */
     .question-row.error .remarks-section .remarks-textarea,
-    .field-error[type="textarea"] { border: 1px solid var(--border); background: #fff; }
-    @media (max-width: 768px) {
-    .question-row, .basic-info .question-row, .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 8px; }
-    }
-    --radius: 6px;
+    .field-error[type="textarea"] {
+      border: 1px solid var(--border);
+      background: white;
     }
   `;
 }
 
+// === HTMLに出力 ===
+/**
+ * 重複している data:image の <img> を 1 つの画像マップに集約し、
+ * 各所の <img> は data-img-id 参照に置換。末尾に JSON + IIFE ローダーを 1 回だけ埋め込む。
+ * 返り値は「最終的に保存する HTML 文字列」。
+ */
+function dedupeInlineImagesWithImg(htmlString) {
+  // 文字列 → DOM
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, 'text/html');
+
+  // data:image を持つ <img> を収集
+  const imgs = Array.from(doc.querySelectorAll('img[src^="data:image"]'));
+
+  // Base64 → ID のマップ／出力用画像マップ
+  const b64ToId = new Map();          // key: base64本体, value: 'img_1' 等
+  const imageMap = {};                // { img_1: { mime, b64 }, ... }
+  let counter = 0;
+
+  const parseDataUrl = (url) => {
+    // 例: data:image/webp;base64,AAA...
+    const m = url.match(/^data:([^;]+);base64,(.+)$/);
+    return m ? { mime: m[1], b64: m[2] } : null;
+  };
+
+  // 画像の重複を集約
+  for (const img of imgs) {
+    const src = img.getAttribute('src');
+    const info = parseDataUrl(src || '');
+    if (!info) continue;
+
+    let id = b64ToId.get(info.b64);
+    if (!id) {
+      id = `img_${++counter}`;
+      b64ToId.set(info.b64, id);
+      imageMap[id] = { mime: info.mime, b64: info.b64 };
+    }
+
+    // <img> は src を外して ID 参照に（alt/class 等は維持）
+    img.removeAttribute('src');
+    img.setAttribute('data-img-id', id);
+  }
+
+  // 1枚でも見つかった場合のみ、画像マップとローダーを挿入
+  if (counter > 0) {
+    // a) 画像マップ（JSON）
+    const scriptMap = doc.createElement('script');
+    scriptMap.type = 'application/json';
+    scriptMap.id = '__EMBEDDED_IMAGE_MAP__';
+    scriptMap.textContent = JSON.stringify(imageMap);
+
+    // b) ローダー（IIFE：読み込み時に data-img-id → src=data:... を復元）
+    const loader = doc.createElement('script');
+    loader.textContent = `
+      (function(){
+        var el = document.getElementById('__EMBEDDED_IMAGE_MAP__');
+        if(!el) return;
+        var map = {};
+        try { map = JSON.parse(el.textContent); } catch(e){}
+        var list = document.querySelectorAll('img[data-img-id]');
+        list.forEach(function(img){
+          var id = img.getAttribute('data-img-id');
+          var ent = map[id];
+          if (ent && !img.getAttribute('src')) {
+            img.setAttribute('src', 'data:' + ent.mime + ';base64,' + ent.b64);
+          }
+        });
+      })();
+    `;
+
+    // 本文末尾に 1 回だけ埋め込む
+    doc.body.appendChild(scriptMap);
+    doc.body.appendChild(loader);
+  }
+
+  // 再シリアライズ（DOCTYPE を付け直す）
+  return '<!doctype html>\n' + doc.documentElement.outerHTML;
+}
+
 // 静的HTML保存
 function saveToStaticHTML() {
+    // 取引内容セクションの自動オープン
+    openTransactionSectionsForSave()
+
     const clone = document.documentElement.cloneNode(true);
 
-    // 不要な要素を削除
-    clone.querySelectorAll('script, style, button, .btn').forEach(el => el.remove());
+    // インタラクティブ要素、埋め込み要素、テンプレートなど不要な要素を削除
+    clone.querySelectorAll('script, style, button, .btn, template').forEach(el => el.remove());
 
     // フォーム要素を静的なテキストに置き換える
     clone.querySelectorAll('input, textarea, select').forEach(el => {
@@ -775,6 +1184,9 @@ function saveToStaticHTML() {
     }
     });
 
+    // サムネイルに残った inline onclick（Base64文字列を含む）を除去
+    clone.querySelectorAll('.image-thumbnail img[onclick]').forEach(img => img.removeAttribute('onclick'));
+
     // <head>に<style>タグでCSSを埋め込む
     const head = clone.querySelector('head');
     if (head) {
@@ -783,32 +1195,30 @@ function saveToStaticHTML() {
         head.appendChild(styleTag);
     }
 
-    // モーダルHTMLをbody末尾に追加
-    const modalHTML = `
-    <div id="imageModal" class="modal" onclick="closeModal()">
-    <div class="modal-content" onclick="event.stopPropagation();">
-        <img id="modalImage" class="modal-image" src="" alt="拡大画像">
-    </div>
-    </div>`;
-    clone.querySelector('body').insertAdjacentHTML('beforeend', modalHTML);
-
     // インラインJSをbody末尾に追加
     const inlineScript = document.createElement('script');
     inlineScript.textContent = `
-    function showModal(imageSrc){document.getElementById('modalImage').src=imageSrc;document.getElementById('imageModal').classList.add('show');}
-    function closeModal(){document.getElementById('imageModal').classList.remove('show');}
-    function toggleAccordion(header){header.parentElement.classList.toggle('open');}
-    document.addEventListener('DOMContentLoaded',function(){
-    document.querySelectorAll('.image-thumbnail img').forEach(img=>{
-        img.onclick=function(){showModal(this.src);};
-    });
-    document.querySelectorAll('.accordion-header').forEach(header=>{
-        header.onclick=function(){toggleAccordion(this);};
-    });
-    });
+      function showModal(imageSrc) {
+        document.getElementById('modalImage').src=imageSrc;
+        document.getElementById('imageModal').classList.add('show');
+      }
+      function closeModal() {
+        document.getElementById('imageModal').classList.remove('show');
+      }
+      function toggleAccordion(header) {
+        if (header.classList.contains('disabled')) return;
+        header.parentElement.classList.toggle('open');
+      }
+      document.addEventListener('DOMContentLoaded',function(){
+        document.querySelectorAll('.image-thumbnail img').forEach(img=>{
+            img.onclick=function(){showModal(this.src);};
+        });
+        document.querySelectorAll('.accordion-header').forEach(header=>{
+            header.onclick=function(){toggleAccordion(this);};
+        });
+      });
     `;
     clone.querySelector('body').appendChild(inlineScript);
-
 
     // 保存用HTMLを生成
     let receptionDate = formData.receptionDate || 'noDate';
@@ -816,11 +1226,15 @@ function saveToStaticHTML() {
     let companyName = formData.companyName || 'noName';
 
     const html = '<!DOCTYPE html>\n' + clone.outerHTML;
-    const blob = new Blob([html], { type: 'text/html' });
+    const finalHtml = dedupeInlineImagesWithImg(html); // 画像(base64形式)の重複排除
+    const blob = new Blob([finalHtml], { type: 'text/html' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${receptionDate}_${companyName}.html`;
     a.click();
+
+    // JSONでも保存
+    saveToJSON()
 }
 
 //編集モード切替用関数setAll
@@ -845,8 +1259,7 @@ function setAllFieldsDisabled(disabled) {
 
 //編集ボタンの動作
 function enableEditMode() {
-  setAllFieldsDisabled(false);
-  document.getElementById('editButton').style.display = 'none';
+  setStatus(STATUS.EDITING);
 }
 
 function loadFromJSON(event) {
@@ -859,39 +1272,33 @@ function loadFromJSON(event) {
                 if (data.formData) {
                     formData = data.formData;
                     imageData = data.imageData || {};
+                    const count = Number(formData.transactionCount ?? 1);
                     
-                    // フォームデータを復元
-                    Object.keys(formData).forEach(key => {
-                    const elements = document.querySelectorAll(`[data-field="${key}"]`);
-                    if (elements.length > 0 && elements[0].type === 'radio') {
-                        elements.forEach(el => {
-                        el.checked = el.value === formData[key];
-                        });
-                    } else if (elements.length > 0) {
-                        elements[0].value = formData[key];
+                    // 取引内容の中身を事前生成（件数に合わせて）
+                    for (let i = 1; i <= count; i++) {
+                      ensureSectionContentGenerated(i);
                     }
-                    });
 
-                    
+                    // フォームデータを復元
+                    applyFormDataToDOM();
+
                     // 画像データを復元
                     Object.keys(imageData).forEach(fieldName => {
-                        displayImages(fieldName);
+                      displayImages(fieldName);
                     });
-                    
+
                     // 動的フィールドを更新
                     updateDynamicFields();
                     updateBusinessAgeFields();
                     updateTransactionScaleFields();
-                    updateTransactionHeaderHighlight();
-                    
-                    // 提出可能日フィールド、地域フィールド、送金原資フィールドを更新
-                    for (let i = 1; i <= 5; i++) {
-                        updateSubmissionDateFields(i)
+                    updateRemitSourceFields();
+                    for (let i = 1; i <= count; i++) {
+                        updateSubmissionDateFields(i);
                         updateLocationFields(i);
-                        updateRemitSourceFields(i)
                     }
-                    
-                    bindEvents();
+
+                    // 状態：ファイル読込後（編集不可）
+                    setStatus(STATUS.LOADED);
                 }
             } catch (error) {
                 alert('JSONファイルの読み込みに失敗しました。');
@@ -899,7 +1306,4 @@ function loadFromJSON(event) {
         };
         reader.readAsText(file);
     }
-    // ...既存の復元処理の後
-    setAllFieldsDisabled(true);
-    document.getElementById('editButton').style.display = 'inline-block';
 }
